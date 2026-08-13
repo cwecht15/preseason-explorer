@@ -1,0 +1,4 @@
+streamlit>=1.49
+pandas
+altair
+requests

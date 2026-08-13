@@ -1,0 +1,5 @@
+.git
+auth.txt
+game_2025*.json
+__pycache__
+*.pyc

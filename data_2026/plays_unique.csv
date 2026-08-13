@@ -1,0 +1,209 @@
+gameId,week,nflPlayId,nflPlayType,nflPlayDescription,nflPlayUrl
+2026001,0,1,GAME_START,GAME,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=1
+2026001,0,40,KICK_OFF,C.Ryland kicks 67 yards from AZ 35 to CAR -2. A.Tyus to CAR 25 for 27 yards (I.Oliver).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=40
+2026001,0,63,PASS,(14:54) (Shotgun) K.Pickett pass short left to J.Sanders to CAR 31 for 6 yards (D.Taylor-Demerson).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=63
+2026001,0,88,PASS,(14:14) (Shotgun) K.Pickett pass short right to J.Sanders to CAR 33 for 2 yards (K.King).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=88
+2026001,0,113,SACK,(13:35) (Shotgun) K.Pickett sacked at CAR 28 for -5 yards (A.Billings).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=113
+2026001,0,133,PUNT,"(12:57) S.Martin punts 56 yards to AZ 16, Center-J.Jansen. X.Weaver to AZ 23 for 7 yards (R.Rochell). FUMBLES (R.Rochell), and recovers at AZ 23.",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=133
+2026001,0,159,PASS,(12:45) (Shotgun) C.Beck pass short left to K.Yeboah to AZ 27 for 4 yards (T.Wallace; Z.Wheatley).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=159
+2026001,0,184,RUSH,(12:14) Z.Knight right tackle to AZ 30 for 3 yards (W.Lee).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=184
+2026001,0,206,RUSH,(11:40) (Shotgun) C.Beck scrambles up the middle to AZ 34 for 4 yards (T.Wallace; C.Cherelus).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=206
+2026001,0,228,RUSH,(11:07) Z.Knight left guard to AZ 37 for 3 yards (L.Ransom; T.Wallace).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=228
+2026001,0,250,PASS,(10:38) C.Beck pass short middle to R.Fairweather to AZ 42 for 5 yards (C.Cherelus).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=250
+2026001,0,275,PASS,(10:04) (Shotgun) C.Beck pass incomplete short right to J.Brooks (W.Lee).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=275
+2026001,0,298,PUNT,"(10:01) B.Gillikin punts 55 yards to CAR 3, Center-C.Kreiter, out of bounds.",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=298
+2026001,0,329,TIMEOUT,Timeout at 09:51.,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=329
+2026001,0,317,RUSH,(9:51) T.Etienne right tackle to CAR 1 for -2 yards (A.Billings). AZ-Z.Carter was injured during the play.,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=317
+2026001,0,363,PASS,(9:13) (Shotgun) K.Pickett pass incomplete short middle to D.Moore (A.Keys).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=363
+2026001,0,386,PENALTY,"(9:09) (No Huddle, Shotgun) PENALTY on CAR-A.Reese, False Start, 0 yards, enforced at CAR 1 - No Play.",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=386
+2026001,0,410,PENALTY,"(9:09) (Shotgun) K.Pickett pass incomplete deep right to B.Tremayne [A.Billings].
+PENALTY on AZ-K.Clark, Defensive Pass Interference, 31 yards, enforced at CAR 1 - No Play.",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=410
+2026001,0,444,RUSH,(9:03) (Shotgun) T.Etienne right guard to CAR 34 for 2 yards (A.Keys; A.Billings).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=444
+2026001,0,466,PASS,"(8:31) (Shotgun) K.Pickett pass short right to T.Etienne pushed ob at CAR 33 for -1 yards (K.Crawford).
+Penalty on CAR-A.Reese, Offensive Holding, declined.",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=466
+2026001,0,507,PASS,(8:07) (Shotgun) K.Pickett pass short right to J.Sanders to CAR 38 for 5 yards (K.Clark).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=507
+2026001,0,532,PUNT,"(7:25) S.Martin punts 58 yards to AZ 4, impetus ends at AZ 1, Center-J.Jansen, downed by CAR-J.Reed.",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=532
+2026001,0,573,TIMEOUT,Timeout at 07:12.,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=573
+2026001,0,561,PENALTY,"(7:12) PENALTY on AZ-K.Yeboah, False Start, 2 yards, enforced at AZ 4 - No Play.",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=561
+2026001,0,593,RUSH,(7:12) Z.Knight right tackle to AZ 4 for 2 yards (L.Ransom; C.Cherelus).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=593
+2026001,0,615,RUSH,(6:35) (Shotgun) Z.Knight up the middle to AZ 7 for 3 yards (C.Jackson).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=615
+2026001,0,637,PASS,(6:00) (Shotgun) C.Beck pass deep right to J.Brooks to AZ 42 for 35 yards (Z.Wheatley).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=637
+2026001,0,662,PASS,(5:23) C.Beck pass short left to X.Weaver pushed ob at AZ 45 for 3 yards (A.Evans).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=662
+2026001,0,692,RUSH,(4:57) Z.Knight left guard to CAR 44 for 11 yards (Z.Wheatley; W.Lee).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=692
+2026001,0,714,PASS,(4:19) C.Beck pass short right to J.Geers to CAR 40 for 4 yards (W.Lee).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=714
+2026001,0,739,PASS,(3:41) C.Beck pass short middle to J.Brooks to CAR 25 for 15 yards (A.Evans).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=739
+2026001,0,764,RUSH,(3:04) Z.Knight left tackle to CAR 22 for 3 yards (Z.Wheatley; L.Hunter).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=764
+2026001,0,786,PASS,(2:23) (Shotgun) C.Beck pass short right to R.Fairweather to CAR 16 for 6 yards (L.Ransom; W.Lee).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=786
+2026001,0,811,RUSH,(1:45) Z.Knight left tackle to CAR 13 for 3 yards (C.Smith-Wade; A.Evans).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=811
+2026001,0,833,RUSH,(1:05) C.Kiner right tackle to CAR 9 for 4 yards (C.Jackson).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=833
+2026001,0,855,PASS,(:29) (Shotgun) C.Beck pass short middle to C.Kiner to CAR 1 for 8 yards (C.Cherelus).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=855
+2026001,0,880,END_QUARTER,END QUARTER 1,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=880
+2026001,0,900,RUSH,"(15:00) C.Kiner left tackle for 1 yard, TOUCHDOWN.",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=900
+2026001,0,923,XP_KICK,"C.Ryland extra point is GOOD, Center-C.Kreiter, Holder-B.Gillikin.",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=923
+2026001,0,938,KICK_OFF,C.Ryland kicks 68 yards from AZ 35 to CAR -3. J.Metchie to CAR 33 for 36 yards (K.Sharar).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=938
+2026001,0,961,RUSH,(14:49) T.Etienne left guard to CAR 38 for 5 yards (B.Ojulari).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=961
+2026001,0,983,RUSH,(14:17) (Shotgun) T.Etienne left tackle to CAR 45 for 7 yards (E.Leota; W.Williams).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=983
+2026001,0,1005,PASS,(13:41) K.Pickett pass short left to J.Metchie to AZ 36 for 19 yards (I.Oliver).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=1005
+2026001,0,1030,PASS,"(13:07) (No Huddle, Shotgun) K.Pickett pass short left to D.Moore to AZ 31 for 5 yards (A.Keys).",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=1030
+2026001,0,1055,PASS,(12:32) (Shotgun) K.Pickett pass incomplete deep left to J.Metchie (E.Culp).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=1055
+2026001,0,1090,PASS,(12:25) (Shotgun) K.Pickett pass short right to J.Mitchell pushed ob at AZ 23 for 8 yards (W.Williams).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=1090
+2026001,0,1120,PASS,(11:56) K.Pickett pass incomplete deep right to J.Mitchell (A.Keys).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=1120
+2026001,0,1143,PASS,(11:49) (Shotgun) K.Pickett pass short right to A.Dillon to AZ 5 for 18 yards (A.Keys; I.Oliver).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=1143
+2026001,0,1168,RUSH,"(11:24) (No Huddle, Shotgun) A.Dillon up the middle to AZ 1 for 4 yards (A.Billings; W.Williams).",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=1168
+2026001,0,1190,RUSH,"(10:59) (No Huddle) A.Dillon up the middle for 1 yard, TOUCHDOWN.",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=1190
+2026001,0,1213,XP_KICK,"R.Fitzgerald extra point is GOOD, Center-J.Jansen, Holder-S.Martin.",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=1213
+2026001,0,1238,TIMEOUT,Timeout at 10:56.,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=1238
+2026001,0,1228,KICK_OFF,"R.Fitzgerald kicks 42 yards from CAR 35 to AZ 23, short of landing zone.
+PENALTY on CAR-R.Fitzgerald, Kickoff Short of Landing Zone, placed at AZ 40.",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=1228
+2026001,0,1273,PASS,"(10:56) C.Beck pass deep left to J.Brooks to CAR 11 for 49 yards (L.Ransom).
+Penalty on CAR-A.Evans, Illegal Contact, declined.",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=1273
+2026001,0,1309,RUSH,(10:23) Z.Knight left tackle to CAR 5 for 6 yards (Z.Wheatley).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=1309
+2026001,0,1331,PASS,(9:46) C.Beck pass incomplete short right.,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=1331
+2026001,0,1366,TIMEOUT,Timeout #1 by AZ at 09:42.,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=1366
+2026001,0,1354,PASS,"(9:42) (Shotgun) C.Beck pass short right to S.Fehoko for 5 yards, TOUCHDOWN.",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=1354
+2026001,0,1387,XP_KICK,"C.Ryland extra point is GOOD, Center-C.Kreiter, Holder-B.Gillikin.",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=1387
+2026001,0,1402,KICK_OFF,"C.Ryland kicks 65 yards from AZ 35 to end zone, Touchback to the CAR 35.",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=1402
+2026001,0,1419,RUSH,(9:38) A.Dillon right guard to CAR 48 for 13 yards (I.Oliver; W.Williams).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=1419
+2026001,0,1441,PASS,(9:05) H.King pass incomplete short left to J.Reed.,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=1441
+2026001,0,1464,PASS,(8:59) (Shotgun) H.King pass short middle to M.Meiga to AZ 39 for 13 yards (K.Clark).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=1464
+2026001,0,1489,PASS,"(8:32) (No Huddle, Shotgun) H.King pass short right to F.Franks to AZ 35 for 4 yards (O.Pappoe).",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=1489
+2026001,0,1514,PASS,(7:54) (Shotgun) H.King pass incomplete deep left to M.Meiga.,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=1514
+2026001,0,1537,PASS,(7:48) (Shotgun) H.King pass short left to J.Metchie to AZ 27 for 8 yards (K.King).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=1537
+2026001,0,1562,PASS,(7:13) (Shotgun) H.King pass incomplete short middle to E.Cooks (E.Culp).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=1562
+2026001,0,1585,RUSH,(7:09) (Shotgun) H.King scrambles right end to AZ 19 for 8 yards (K.Clark).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=1585
+2026001,0,1607,PASS,(6:31) (Shotgun) H.King pass short right to F.Franks ran ob at AZ 15 for 4 yards (I.Oliver).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=1607
+2026001,0,1637,PASS,"(6:00) H.King pass short left to J.Reed for 15 yards, TOUCHDOWN.",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=1637
+2026001,0,1663,XP_KICK,"R.Fitzgerald extra point is GOOD, Center-J.Jansen, Holder-S.Martin.",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=1663
+2026001,0,1688,TIMEOUT,Timeout at 05:54.,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=1688
+2026001,0,1678,KICK_OFF,R.Fitzgerald kicks 58 yards from CAR 35 to AZ 7. X.Weaver to AZ 32 for 25 yards (C.Gill; R.Rochell).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=1678
+2026001,0,1708,PENALTY,"(5:49) (Shotgun) PENALTY on AZ-J.Fryar, False Start, 5 yards, enforced at AZ 32 - No Play.",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=1708
+2026001,0,1732,PASS,(5:49) (Shotgun) C.Beck pass incomplete short left to X.Weaver.,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=1732
+2026001,0,1755,PASS,(5:46) (Shotgun) C.Beck pass short right to R.Virgil to AZ 41 for 14 yards (C.Thornton).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=1755
+2026001,0,1785,PENALTY,"(5:02) (Shotgun) C.Beck pass incomplete deep left to R.Virgil (C.Smith-Wade) [T.Incoom].
+PENALTY on CAR-C.Thornton, Defensive Holding, 5 yards, enforced at AZ 41 - No Play.
+Penalty on CAR-C.Smith-Wade, Illegal Contact, declined.",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=1785
+2026001,0,1819,RUSH,(4:56) Z.Knight right tackle to CAR 49 for 5 yards (J.Kuwatch; N.Hampton).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=1819
+2026001,0,1841,RUSH,"(4:14) Z.Knight right guard to CAR 34 for 15 yards (Z.Wheatley; C.Smith-Wade). FUMBLES (Z.Wheatley), and recovers at CAR 34.",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=1841
+2026001,0,1879,RUSH,(3:25) C.Kiner right guard to CAR 29 for 5 yards (E.Garcia; C.Gill).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=1879
+2026001,0,1901,RUSH,(2:48) C.Kiner right tackle to CAR 21 for 8 yards (Z.Wheatley; C.Gill).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=1901
+2026001,0,1923,RUSH,(2:05) C.Kiner left end to CAR 17 for 4 yards (J.Kuwatch; A.Evans).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=1923
+2026001,0,1957,TIMEOUT,Two-Minute Warning,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=1957
+2026001,0,1945,RUSH,(2:00) Z.Knight right tackle to CAR 15 for 2 yards (B.Martin-Scott; A.Evans).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=1945
+2026001,0,1986,TIMEOUT,Timeout #1 by CAR at 01:55.,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=1986
+2026001,0,1974,SACK,(1:55) (Shotgun) C.Beck sacked at CAR 17 for -2 yards (J.Harrison-Hunte).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=1974
+2026001,0,2013,TIMEOUT,Timeout #2 by CAR at 01:50.,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=2013
+2026001,0,2001,FIELD_GOAL,"(1:50) C.Ryland 35 yard field goal is GOOD, Center-C.Kreiter, Holder-B.Gillikin.",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=2001
+2026001,0,2038,TIMEOUT,Timeout at 01:46.,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=2038
+2026001,0,2028,KICK_OFF,"C.Ryland kicks 65 yards from AZ 35 to end zone, Touchback to the CAR 35.",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=2028
+2026001,0,2057,PASS,(1:46) (Shotgun) H.King pass incomplete short right to J.Metchie.,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=2057
+2026001,0,2080,PASS,"(1:42) (No Huddle, Shotgun) H.King pass short middle to J.Reed to 50 for 15 yards (W.Williams; I.Oliver).",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=2080
+2026001,0,2105,PASS,"(1:24) (No Huddle, Shotgun) H.King pass short right to J.Metchie ran ob at AZ 39 for 11 yards.",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=2105
+2026001,0,2130,PASS,"(1:17) (No Huddle, Shotgun) H.King pass short right to J.Mitchell to AZ 38 for 1 yard (A.Keys).",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=2130
+2026001,0,2155,PASS,"(:57) (No Huddle, Shotgun) H.King pass short right to J.Mitchell pushed ob at AZ 32 for 6 yards (A.Keys).",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=2155
+2026001,0,2185,PASS,(:53) (Shotgun) H.King pass short right to Ji.Horn to AZ 15 for 17 yards (B.Martin).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=2185
+2026001,0,2210,PASS,"(:27) (No Huddle, Shotgun) H.King pass incomplete short right to J.Metchie.",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=2210
+2026001,0,2233,PASS,(:23) (Shotgun) H.King pass incomplete short right to Ji.Horn.,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=2233
+2026001,0,2256,PASS,"(:18) (Shotgun) H.King pass short right to Ji.Horn to AZ 15 for no gain (E.Jones) [E.Leota].
+Penalty on CAR, Illegal Shift, declined.",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=2256
+2026001,0,2292,FIELD_GOAL,"(:12) R.Fitzgerald 33 yard field goal is GOOD, Center-J.Jansen, Holder-S.Martin.",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=2292
+2026001,0,2312,KICK_OFF,"R.Fitzgerald kicks 65 yards from CAR 35 to end zone, Touchback to the AZ 35.",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=2312
+2026001,0,2329,RUSH,(:08) C.Beck kneels to AZ 34 for -1 yards.,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=2329
+2026001,0,2351,END_QUARTER,END QUARTER 2,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=2351
+2026001,0,2371,KICK_OFF,"R.Fitzgerald kicks 65 yards from CAR 35 to landing zone to end zone, Touchback to the AZ 20.",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=2371
+2026001,0,2393,PASS,(15:00) C.Beck pass short right to X.Weaver ran ob at AZ 29 for 9 yards (R.Rochell).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=2393
+2026001,0,2423,RUSH,(14:34) Z.Knight right guard to AZ 33 for 4 yards (T.Incoom).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=2423
+2026001,0,2445,PENALTY,"(13:54) PENALTY on CAR-T.Malone, Encroachment, 5 yards, enforced at AZ 33 - No Play.",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=2445
+2026001,0,2469,PASS,(13:40) C.Beck pass short right to J.Geers pushed ob at CAR 46 for 16 yards (C.Thornton).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=2469
+2026001,0,2499,PENALTY,"(13:10) PENALTY on AZ-C.Kiner, False Start, 5 yards, enforced at CAR 46 - No Play.",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=2499
+2026001,0,2523,RUSH,(12:54) C.Kiner left end to CAR 46 for 5 yards (T.Incoom; J.Kuwatch).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=2523
+2026001,0,2545,PENALTY,"(12:12) C.Beck pass short right to C.Kiner to CAR 41 for 5 yards (B.Martin-Scott; J.Kuwatch).
+PENALTY on AZ-Ja.Williams, Offensive Holding, 10 yards, enforced at CAR 46 - No Play.",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=2545
+2026001,0,2586,PASS,(11:48) (Shotgun) C.Beck pass short left to R.Virgil to CAR 47 for 9 yards (C.Thornton).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=2586
+2026001,0,2616,PASS,(11:06) (Shotgun) C.Beck pass short right to K.Yeboah to CAR 41 for 6 yards (D.Smith).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=2616
+2026001,0,2641,PASS,(10:23) (Shotgun) C.Beck pass incomplete deep left to R.Virgil (I.Simmons).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=2641
+2026001,0,2688,TIMEOUT,Timeout at 10:15.,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=2688
+2026001,0,2676,RUSH,(10:15) A.Tyus left end to CAR 40 for -1 yards (E.Culp).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=2676
+2026001,0,2705,RUSH,"(9:41) (Shotgun) A.Tyus up the middle to CAR 46 for 6 yards (Q.Newsome). FUMBLES (Q.Newsome), RECOVERED by AZ-I.Oliver at CAR 48.",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=2705
+2026001,0,2748,RUSH,(9:34) C.Kiner left end to CAR 49 for -1 yards (E.Garcia).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=2748
+2026001,0,2770,PASS,(9:01) (Shotgun) K.Slovis pass short left to R.Virgil to CAR 39 for 10 yards (R.Rochell).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=2770
+2026001,0,2795,RUSH,(8:28) C.Kiner right guard to CAR 36 for 3 yards (I.Smith).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=2795
+2026001,0,2817,RUSH,(7:59) C.Kiner left end to CAR 31 for 5 yards (B.Martin-Scott).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=2817
+2026001,0,2839,PASS,(7:27) K.Slovis pass short right to X.Weaver to CAR 12 for 19 yards (B.Martin-Scott; D.Richardson).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=2839
+2026001,0,2864,RUSH,(6:50) E.Hull right tackle to CAR 9 for 3 yards (B.Martin-Scott; I.Simmons).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=2864
+2026001,0,2886,PENALTY,"(6:16) (Shotgun) K.Slovis pass incomplete short right to R.Fairweather (I.Simmons).
+PENALTY on AZ-M.Pryor, Offensive Holding, 10 yards, enforced at CAR 9 - No Play.",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=2886
+2026001,0,2920,SACK,(6:08) (Shotgun) K.Slovis sacked at CAR 29 for -10 yards (N.Hampton).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=2920
+2026001,0,2940,RUSH,(5:26) (Shotgun) C.Kiner up the middle to CAR 24 for 5 yards (I.Simmons; Z.Wheatley).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=2940
+2026001,0,2962,FIELD_GOAL,"(4:46) C.Ryland 43 yard field goal is GOOD, Center-C.Kreiter, Holder-B.Gillikin.",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=2962
+2026001,0,2992,TIMEOUT,Timeout at 04:42.,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=2992
+2026001,0,2982,KICK_OFF,C.Ryland kicks 63 yards from AZ 35 to CAR 2. Ji.Horn to CAR 27 for 25 yards (B.Ojulari).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=2982
+2026001,0,3012,RUSH,(4:37) A.Tyus up the middle to CAR 30 for 3 yards (A.Keys; K.Sharar).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=3012
+2026001,0,3034,RUSH,(4:00) (Shotgun) A.Tyus left guard to CAR 32 for 2 yards (C.Horsley; B.Martin).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=3034
+2026001,0,3056,PENALTY,"(3:14) (Shotgun) H.King scrambles left end to CAR 38 for 6 yards (K.Sharar).
+PENALTY on CAR-J.Carter, Offensive Holding, 10 yards, enforced at CAR 32 - No Play.",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=3056
+2026001,0,3089,PASS,"(2:57) (Shotgun) H.King pass short right to Ji.Horn pushed ob at CAR 37 for 15 yards (E.Culp).
+PENALTY on AZ-E.Culp, Unnecessary Roughness, 15 yards, enforced at CAR 37.",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=3089
+2026001,0,3130,RUSH,(2:35) A.Tyus left end pushed ob at AZ 41 for 7 yards (E.Jones).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=3130
+2026001,0,3152,PASS,(2:03) H.King pass short left to C.Washington pushed ob at AZ 34 for 7 yards (E.Culp).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=3152
+2026001,0,3182,RUSH,(1:36) A.Tyus right end to AZ 33 for 1 yard (K.Sharar; B.Ojulari).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=3182
+2026001,0,3204,RUSH,(:55) (Shotgun) A.Tyus up the middle to AZ 33 for no gain (D.Williams; I.Oliver).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=3204
+2026001,0,3226,PASS,(:13) (Shotgun) H.King pass short right to C.Washington to AZ 26 for 7 yards (E.Culp).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=3226
+2026001,0,3251,END_QUARTER,END QUARTER 3,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=3251
+2026001,0,3271,PASS,(15:00) (Shotgun) H.King pass short right to C.Prieskorn pushed ob at AZ 5 for 21 yards (W.Williams; Q.Newsome).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=3271
+2026001,0,3301,PASS,"(14:25) H.King pass short left to A.Tyus for 5 yards, TOUCHDOWN.",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=3301
+2026001,0,3327,XP_KICK,"R.Fitzgerald extra point is GOOD, Center-J.Jansen, Holder-S.Martin.",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=3327
+2026001,0,3352,TIMEOUT,Timeout at 14:20.,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=3352
+2026001,0,3342,KICK_OFF,R.Fitzgerald kicks 55 yards from CAR 35 to AZ 10. H.Wallace to AZ 30 for 20 yards (A.Tyus).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=3342
+2026001,0,3372,RUSH,(14:14) E.Hull up the middle to AZ 34 for 4 yards (J.Kuwatch).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=3372
+2026001,0,3394,PASS,(13:42) K.Slovis pass deep left to H.Wallace to CAR 39 for 27 yards (D.Richardson).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=3394
+2026001,0,3419,RUSH,"(13:07) E.Hull up the middle to CAR 30 for 9 yards (C.Miller, I.Simmons).",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=3419
+2026001,0,3441,RUSH,(12:26) E.Hull left guard to CAR 25 for 5 yards (J.Kuwatch; E.Garcia).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=3441
+2026001,0,3463,RUSH,(11:47) E.Hull left tackle to CAR 25 for no gain (T.Incoom).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=3463
+2026001,0,3485,PASS,(11:11) (Shotgun) K.Slovis pass short middle to R.Fairweather to CAR 17 for 8 yards (D.Smith).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=3485
+2026001,0,3510,PASS,(10:28) K.Slovis pass incomplete short right to X.Weaver.,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=3510
+2026001,0,3538,FIELD_GOAL,"(10:23) C.Ryland 35 yard field goal is GOOD, Center-C.Kreiter, Holder-B.Gillikin.",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=3538
+2026001,0,3568,TIMEOUT,Timeout at 10:19.,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=3568
+2026001,0,3558,KICK_OFF,C.Ryland kicks 61 yards from AZ 35 to CAR 4. J.Reed to CAR 30 for 26 yards (R.Virgil).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=3558
+2026001,0,3600,TIMEOUT,Timeout at 10:13.,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=3600
+2026001,0,3588,RUSH,(10:13) M.Davis right tackle to CAR 35 for 5 yards (C.Horsley; A.Keys).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=3588
+2026001,0,3617,RUSH,(9:42) M.Davis left guard to CAR 39 for 4 yards (C.Robertson; C.Horsley).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=3617
+2026001,0,3639,RUSH,(9:07) M.Davis right guard to AZ 25 for 36 yards (E.Jones).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=3639
+2026001,0,3661,PASS,(8:24) H.King pass short right to M.Davis to AZ 20 for 5 yards (E.Culp).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=3661
+2026001,0,3686,RUSH,(7:42) (Shotgun) A.Tyus left tackle to AZ 19 for 1 yard (K.Sharar; D.Williams).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=3686
+2026001,0,3708,PASS,(7:00) (Shotgun) H.King pass incomplete short left to Ji.Horn.,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=3708
+2026001,0,3731,FIELD_GOAL,"(6:57) R.Fitzgerald 37 yard field goal is GOOD, Center-J.Jansen, Holder-S.Martin.",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=3731
+2026001,0,3761,TIMEOUT,Timeout at 06:53.,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=3761
+2026001,0,3751,KICK_OFF,R.Fitzgerald kicks 56 yards from CAR 35 to AZ 9. H.Wallace to AZ 38 for 29 yards (C.Washington).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=3751
+2026001,0,3781,PASS,"(6:48) K.Slovis pass deep middle to R.Virgil to CAR 45 for 17 yards (T.Funderburk).
+Carolina challenged the pass completion ruling, and the play was Upheld. The ruling on the field stands. (Timeout #1.)",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=3781
+2026001,0,3806,RUSH,(6:14) C.Kiner right tackle to CAR 32 for 13 yards (T.Funderburk).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=3806
+2026001,0,3868,RUSH,(5:39) C.Kiner left tackle to CAR 31 for 1 yard (P.Petersen).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=3868
+2026001,0,3890,PASS,"(5:16) (No Huddle, Shotgun) K.Slovis pass short middle to C.Kiner to CAR 30 for 1 yard (M.Njongmeta).",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=3890
+2026001,0,3915,PASS,(4:34) (Shotgun) K.Slovis pass short right to R.Virgil to CAR 14 for 16 yards (M.Mwansa).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=3915
+2026001,0,3940,RUSH,(4:01) C.Kiner up the middle to CAR 12 for 2 yards (K.Barrs; C.Gill).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=3940
+2026001,0,3962,PASS,(3:27) K.Slovis pass short right to H.Wallace pushed ob at CAR 5 for 7 yards (D.Smith).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=3962
+2026001,0,3992,RUSH,(3:21) E.Hull up the middle to CAR 3 for 2 yards (C.Gill).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=3992
+2026001,0,4026,TIMEOUT,Timeout #1 by AZ at 02:38.,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=4026
+2026001,0,4014,RUSH,(2:38) C.Kiner up the middle to CAR 1 for 2 yards (M.Mwansa; D.Smith).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=4014
+2026001,0,4055,TIMEOUT,Two-Minute Warning,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=4055
+2026001,0,4043,PASS,"(2:00) K.Slovis pass incomplete short right to B.Green.
+The Replay Official reviewed the incomplete pass ruling, and the play was REVERSED.
+K.Slovis pass short right to B.Green for 1 yard, TOUCHDOWN.",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=4043
+2026001,0,4073,XP_KICK,"C.Ryland extra point is GOOD, Center-C.Kreiter, Holder-B.Gillikin.",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=4073
+2026001,0,4135,KICK_OFF,"C.Ryland kicks 65 yards from AZ 35 to end zone, Touchback to the CAR 35.",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=4135
+2026001,0,4152,PASS,(1:55) (Shotgun) H.King pass incomplete short right to E.Cooks.,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=4152
+2026001,0,4175,PASS,(1:50) (Shotgun) H.King pass incomplete deep right to C.Washington.,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=4175
+2026001,0,4198,PASS,(1:45) (Shotgun) H.King pass short right to C.Washington to CAR 45 for 10 yards (I.Oliver).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=4198
+2026001,0,4223,PASS,"(1:25) (No Huddle, Shotgun) H.King pass short right to M.Davis to AZ 47 for 8 yards (A.Keys).",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=4223
+2026001,0,4248,RUSH,"(:57) (No Huddle, Shotgun) M.Davis up the middle to AZ 39 for 8 yards (A.Keys).",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=4248
+2026001,0,4282,TIMEOUT,Timeout #2 by CAR at 00:52.,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=4282
+2026001,0,4270,PASS,(:52) (Shotgun) H.King pass short left to M.Davis to AZ 43 for -4 yards (A.Keys).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=4270
+2026001,0,4314,TIMEOUT,Timeout #3 by CAR at 00:44.,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=4314
+2026001,0,4302,PASS,(:44) (Shotgun) H.King pass incomplete deep left to C.Washington.,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=4302
+2026001,0,4332,RUSH,(:39) (Shotgun) H.King scrambles left end pushed ob at AZ 17 for 26 yards (A.Keys).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=4332
+2026001,0,4359,PASS,(:28) (Shotgun) H.King pass incomplete deep left to Ji.Horn.,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=4359
+2026001,0,4382,PASS,(:23) (Shotgun) H.King pass short right to Ji.Horn to AZ 5 for 12 yards (W.Williams).,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=4382
+2026001,0,4407,PASS,(:07) (No Huddle) H.King spiked the ball to stop the clock.,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=4407
+2026001,0,4442,PASS,(:06) (Shotgun) H.King pass incomplete short right to E.Cooks.,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=4442
+2026001,0,4465,RUSH,"(:02) (Shotgun) H.King scrambles up the middle for 5 yards, TOUCHDOWN.",https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=4465
+2026001,0,4488,END_GAME,END GAME,https://pro.nfl.com/api/plays/summaryPlay?gameId=c66cf251-5f68-11f1-b1d0-bb70a4640075&playId=4488
