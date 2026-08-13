@@ -2,7 +2,7 @@
 
 Streamlit app for exploring NFL preseason on-field lineups: who plays with whom,
 starter usage by team and coach, snap-order depth charts, and drive-by-drive
-rotations. Live at https://preseason-fp.fly.dev.
+rotations. Hosted on Streamlit Community Cloud.
 
 ## Views
 
@@ -39,5 +39,6 @@ Raw 2025 game JSONs (57 MB) are not committed; refetch with the pipeline.
 streamlit run preseason_app.py
 ```
 
-Deploy: `fly deploy` (data CSVs are baked into the image; the in-app fetch
-buttons only work locally where `auth.txt` and the Postgres DB exist).
+Deployed via Streamlit Community Cloud from this repo (main branch,
+`preseason_app.py`) — every push redeploys automatically. The in-app fetch
+buttons only work locally where `auth.txt` and the Postgres DB exist.
