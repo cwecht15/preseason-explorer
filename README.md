@@ -24,6 +24,22 @@ co-player counts, drive matrix and timelines all narrow to those snaps.
 Buckets are computed in the app, not baked into the CSVs, so the definitions
 are adjustable under *Definitions*: a passing down defaults to 3rd/4th & 5+ or
 2nd & 8+, short yardage to 2 or fewer, and those thresholds are sliders.
+
+**Chances, not just snaps.** A raw bucket count can't tell "he came off the
+field for it" from "it never came up while he was in", and against a whole
+game's denominator a starter who played one drive looks like he skipped
+everything. So the Situations tabs count *chances*: the snaps that were his to
+play, shown as `played/chances`. `0/3` means the situation came up three times
+while he was in the game and somebody else went out there for it; `0/0` means
+it never came up, which is no evidence either way.
+
+What counts as a chance is the **drive** by default — every snap of a drive he
+took at least one snap on — because that's the unit preseason rotations swap
+in. *First to last snap* is the looser alternative, and spans drives he sat out
+entirely. Pair either with the **QB on the field** picker, which is the closest
+this data gets to "were the ones out there?": choose the starter and both sides
+of the ratio count only his snaps. On a defense the picker lists the
+quarterbacks it lined up against, which asks the same question.
 Personnel is counted off the positions the NFL lists players at, not where they
 actually lined up — a fullback counts as an RB, a tackle-eligible package reads
 as six linemen — so "11 personnel" here means 1 RB and 1 TE by roster listing.

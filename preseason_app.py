@@ -295,11 +295,89 @@ def scoped(data_dir, weeks_selected, sit):
     if sit and any(sit[k] != DEFAULT_SIT[k] for k in ("pass_late", "pass_second", "short")):
         plays_pr = plays_pr.assign(Situation=call_bucket(plays_pr, sit))
         pp_pr = pp_pr.assign(Situation=call_bucket(pp_pr, sit))
+    pp_all = pp_pr  # pre-filter: the Situations tabs need the whole breakdown
     if situation_active(sit):
         plays_pr = plays_pr[situation_mask(plays_pr, sit)]
         pp_pr = pp_pr[situation_mask(pp_pr, sit)]
         unit_sizes = unit_totals(pp_pr)
-    return plays_pr, pp_pr, unit_sizes
+    return plays_pr, pp_pr, unit_sizes, pp_all
+
+
+# ---------- Chances: was he out there when the situation came up? ----------
+# A raw bucket count can't tell "he came off for it" from "it never happened
+# while he was in". These build the denominator that can: the snaps his unit
+# ran between his first and last snap of a game, optionally narrowed to the
+# stretch one QB was on the field for — the closest thing preseason data has
+# to "the first-team offense was out there".
+
+def qb_by_play(pp):
+    """(gameId, nflPlayId) -> the QB on the field for the offense."""
+    qb = pp[(pp["side"] == "off") & (pp["position"] == "QB")]
+    return (qb[["gameId", "nflPlayId", "teamId", "playerName"]]
+            .rename(columns={"teamId": "qbTeamId", "playerName": "QB"})
+            .drop_duplicates(["gameId", "nflPlayId"]))
+
+
+def qb_options(pp, units):
+    """QBs whose time on the field overlaps these team-units, most snaps first.
+
+    For an offense that's its own quarterbacks; for a defense it's the ones it
+    lined up against, which is the same "were the starters in?" question.
+    """
+    plays = units.merge(qb_by_play(pp), on=["gameId", "nflPlayId"], how="inner")
+    own = plays["qbTeamId"] == plays["teamId"]
+    plays = plays[((plays["side"] == "off") & own) | ((plays["side"] == "def") & ~own)]
+    return plays, plays.groupby("QB").size().sort_values(ascending=False)
+
+
+def unit_snaps_frame(pp, team, side, cols):
+    """One row per snap the unit played, carrying its situation labels."""
+    sd = pp[(pp["teamId"] == team) & (pp["side"] == side)]
+    keep = ["gameId", "teamId", "side", "nflPlayId", "snapIndex"] + list(cols)
+    return sd[keep].drop_duplicates(["gameId", "nflPlayId"])
+
+
+def stint_windows(pp, team, side):
+    """Per player and game: the unit's first and last snap he was on for."""
+    sd = pp[(pp["teamId"] == team) & (pp["side"] == side)]
+    return (sd.groupby(["playerName", "gameId", "teamId", "side"])["snapIndex"]
+            .agg(first="min", last="max").reset_index())
+
+
+# How much of the game counts as "his to play". The drive is the default
+# because that's the unit preseason rotations actually swap in: a player who
+# takes a snap on a drive was in the game for that drive, and a snap on it he
+# didn't take is a real substitution. First-to-last is the looser one — it
+# spans drives he sat out entirely, which reads as passing up chances he was
+# never offered — and is kept for players who rotate within a drive.
+WINDOWS = {"Drives he played in": "drives",
+           "First to last snap": "stint",
+           "Every snap the unit played": "unit"}
+
+
+def chances_matrix(pp, team, side, col, window, qb_plays=None):
+    """Players x buckets: the snaps that were his to play, per `window`."""
+    unit = unit_snaps_frame(pp, team, side, [col, "driveNum"])
+    if qb_plays is not None:
+        unit = unit.merge(qb_plays, on=["gameId", "nflPlayId"])
+    mine = pp[(pp["teamId"] == team) & (pp["side"] == side)]
+
+    if window == "unit":
+        totals = unit.groupby(col)["nflPlayId"].count()
+        names = pd.Index(sorted(mine["playerName"].unique()), name="playerName")
+        return pd.DataFrame([totals] * len(names), index=names)
+
+    if window == "stint":
+        m = stint_windows(pp, team, side).merge(unit, on=["gameId", "teamId", "side"])
+        m = m[(m["snapIndex"] >= m["first"]) & (m["snapIndex"] <= m["last"])]
+    else:
+        played = (mine[["playerName", "gameId", "driveNum"]].dropna().drop_duplicates())
+        m = played.merge(unit.dropna(subset=["driveNum"]), on=["gameId", "driveNum"])
+
+    if m.empty:
+        return pd.DataFrame(index=pd.Index([], name="playerName"))
+    return m.pivot_table(index="playerName", columns=col, values="nflPlayId",
+                         aggfunc="count", fill_value=0)
 
 
 def situation_controls(plays_df):
@@ -342,17 +420,26 @@ def situation_controls(plays_df):
     return sit
 
 
-def split_table(pp, split_col, order, unit_snaps_by_bucket, as_share):
-    """Players (rows) x situation buckets (columns), snaps or % of unit snaps."""
+def split_table(pp, split_col, order, unit_snaps_by_bucket, mode, chances=None):
+    """Players (rows) x situation buckets (columns).
+
+    mode: 'snaps' raw counts · 'share' % of every unit snap in that bucket ·
+    'chances' played/chances inside his own stint, which is the only one that
+    separates "he came off for it" from "it never came up while he was in".
+    """
     mat = pp.pivot_table(index="playerName", columns=split_col, values="nflPlayId",
                          aggfunc="count", fill_value=0)
     known = [c for c in (order or sorted(mat.columns)) if c in mat.columns and c != "?"]
     extra = [c for c in mat.columns if c not in known and c != "?"]
     mat = mat[known + extra + (["?"] if "?" in mat.columns else [])]
     totals = mat.sum(axis=1)
-    if as_share:
+    if mode == "share":
         denom = unit_snaps_by_bucket.reindex(mat.columns).fillna(0)
         mat = (100 * mat.div(denom.where(denom > 0), axis=1)).round(1)
+    elif mode == "chances" and chances is not None:
+        had = (chances.reindex(index=mat.index, columns=mat.columns)
+               .fillna(0).astype(int).astype(str))
+        mat = mat.astype(int).astype(str) + "/" + had
     pos = (pp.groupby("playerName")["position"]
            .agg(lambda s: s.mode().iat[0] if not s.mode().empty else "?"))
     mat.insert(0, "Snaps", totals)
@@ -817,7 +904,7 @@ def render_team_explorer(data_dir, weeks_selected, season, sit):
     st.caption("Snap-count depth chart from preseason PASS/RUSH plays. "
                "Lower avg entry snap = on the field earlier = higher on the depth chart.")
 
-    plays_pr, pp_pr, unit_sizes = scoped(data_dir, weeks_selected, sit)
+    plays_pr, pp_pr, unit_sizes, pp_all = scoped(data_dir, weeks_selected, sit)
     if situation_active(sit):
         st.info("⚑ Situation filter is on — every count below is snaps **in that "
                 "situation only**, including the depth chart and drive matrix.")
@@ -920,13 +1007,19 @@ def render_team_explorer(data_dir, weeks_selected, season, sit):
 
     # ---- who's on the field by situation ----
     with tab_sit:
-        if not has_situation(tp):
+        tp_all = pp_all[pp_all["teamId"] == team]
+        if not has_situation(tp_all):
             st.info("This season's CSVs have no down & distance yet. Run "
                     "`python backfill_situations.py`, then the preprocess step.")
             return
-        st.caption("Every player's snaps broken out by the situation they were played "
-                   "in — the passing-down back, the base-defense-only linebacker, the "
-                   "goal-line tight end all show up here.")
+        st.caption("Did he stay on the field when the situation changed, or did "
+                   "somebody else come in for it? The passing-down back, the "
+                   "base-defense-only linebacker and the goal-line tight end all show "
+                   "up here.")
+        if situation_active(sit):
+            st.caption("This tab ignores the sidebar situation filter — the whole "
+                       "breakdown *is* the point of it.")
+
         c1, c2 = st.columns([1, 2])
         with c1:
             unit_name = st.radio("Unit", ["Offense", "Defense"], horizontal=True,
@@ -936,10 +1029,42 @@ def render_team_explorer(data_dir, weeks_selected, season, sit):
                                   key="sit_split")
         side = "off" if unit_name == "Offense" else "def"
         col, order = SPLITS[split_name]
-        sd = tp[tp["side"] == side]
+        sd = tp_all[tp_all["side"] == side]
         if sd.empty:
             st.info("No snaps for that unit.")
             return
+
+        units = sd[["gameId", "nflPlayId", "teamId", "side"]].drop_duplicates()
+        qb_plays, qb_counts = qb_options(pp_all, units)
+        c3, c4, c5 = st.columns(3)
+        with c3:
+            qb_pick = st.selectbox(
+                "QB on the field", ["Any QB"] + list(qb_counts.index), key="sit_qb",
+                # .get, not [] - Streamlit keeps a widget's value across reruns, so
+                # the stored QB can outlive the player or team that offered him
+                format_func=lambda q: f"{q} ({qb_counts[q]})" if q in qb_counts else q,
+                help="The closest thing to 'were the ones out there?' — pick the "
+                     "starter and everything below counts only the snaps he was on "
+                     "for. On a defense it's the quarterback they faced.")
+        with c4:
+            window_name = st.radio("Chances counted over", list(WINDOWS),
+                                   key="sit_window",
+                                   help="What counts as a snap he could have played.")
+        with c5:
+            mode_name = st.radio("Show", ["Played / chances", "Snaps",
+                                          "% of every unit snap"], key="sit_mode")
+        window = WINDOWS[window_name]
+        mode = {"Played / chances": "chances", "Snaps": "snaps",
+                "% of every unit snap": "share"}[mode_name]
+
+        picked = qb_plays[qb_plays["QB"] == qb_pick][["gameId", "nflPlayId"]] \
+            if qb_pick != "Any QB" else None
+        if picked is not None:
+            sd = sd.merge(picked, on=["gameId", "nflPlayId"])
+            if sd.empty:
+                st.info(f"No {unit_name.lower()} snaps with {qb_pick} on the field.")
+                return
+
         if split_name == "Offense personnel" and side == "def":
             st.caption("Offense personnel on a defensive unit = the grouping they were "
                        "sent out against.")
@@ -949,20 +1074,101 @@ def render_team_explorer(data_dir, weeks_selected, season, sit):
 
         unit_by_bucket = (sd.drop_duplicates(["gameId", "nflPlayId"])
                           .groupby(col)["nflPlayId"].size())
-        mode = st.radio("Show", ["Snaps", "% of the unit's snaps in that situation"],
-                        horizontal=True, key="sit_mode",
-                        help="Snaps = raw count. % = of every snap the unit played in "
-                             "that situation, how many he was out there for — the "
-                             "column to read when the buckets are different sizes.")
-        st.caption("Unit snaps — " + " · ".join(
-            f"{k}: {v}" for k, v in unit_by_bucket.items()))
-        mat = split_table(sd, col, order, unit_by_bucket,
-                          as_share=mode.startswith("%"))
+        st.caption(("Unit snaps" if qb_pick == "Any QB" else f"Snaps with {qb_pick} in")
+                   + " — " + " · ".join(f"{k}: {v}" for k, v in unit_by_bucket.items()))
+        if mode == "chances":
+            st.caption(f"**played / chances**, where a chance is a snap on a "
+                       f"{'drive he played in' if window == 'drives' else 'play inside his window'}"
+                       ". **0/3** means he was in the game for three of them and off "
+                       "the field for all three; **0/0** means it never came up while "
+                       "he was in — no evidence either way, which is not the same thing.")
+
+        chances = chances_matrix(pp_all, team, side, col, window, picked) \
+            if mode == "chances" else None
+        mat = split_table(sd, col, order, unit_by_bucket, mode, chances)
         st.dataframe(mat, **WIDE, height=min(620, 60 + 35 * len(mat)))
         st.download_button("Download split (CSV)",
                            mat.to_csv().encode("utf-8"),
                            file_name=f"{team_label(team)}_{side}_{split_name}_{season}.csv",
                            mime="text/csv", key="dl_sit")
+
+
+def render_player_situations(pp_all, player_name, sit):
+    """One player: what he was on the field for, out of what he could have been."""
+    me_all = pp_all[pp_all["playerName"].str.lower() == player_name.lower()]
+    if not has_situation(me_all):
+        st.info("This season's CSVs have no down & distance yet. Run "
+                "`python backfill_situations.py`, then the preprocess step.")
+        return
+    st.caption("Did he stay on the field when the situation changed? **Chances** "
+               "counts the snaps that were his to play — by default every snap of a "
+               "drive he took part in. Played **0 of 3** means he was in the game and "
+               "somebody else went out there for it; **0 of 0** means it never came "
+               "up while he was in, which is no evidence either way.")
+    if situation_active(sit):
+        st.caption("This tab ignores the sidebar situation filter — the whole "
+                   "breakdown *is* the point of it.")
+
+    my_units = me_all[["gameId", "nflPlayId", "teamId", "side"]].drop_duplicates()
+    qb_plays, qb_counts = qb_options(pp_all, my_units)
+    c1, c2, c3 = st.columns(3)
+    with c1:
+        split_name = st.selectbox("Split by", list(SPLITS), key="psit_split")
+    with c2:
+        window_name = st.radio("Chances counted over", list(WINDOWS), key="psit_window")
+    with c3:
+        qb_pick = st.selectbox(
+            "QB on the field", ["Any QB"] + list(qb_counts.index), key="psit_qb",
+            # `in` first, not a bare lookup - Streamlit keeps a widget's value across
+            # reruns, so the stored QB can outlive the player who offered him
+            format_func=lambda q: f"{q} ({qb_counts[q]})" if q in qb_counts else q,
+            help="Pick the starter to ask about first-team snaps only. On defensive "
+                 "snaps it's the QB he was facing.")
+    col, order = SPLITS[split_name]
+    window = WINDOWS[window_name]
+    picked = qb_plays[qb_plays["QB"] == qb_pick][["gameId", "nflPlayId"]] \
+        if qb_pick != "Any QB" else None
+
+    mine = me_all.merge(picked, on=["gameId", "nflPlayId"]) if picked is not None \
+        else me_all
+    if mine.empty:
+        st.info(f"He never took a pass/rush snap with {qb_pick} on the field — which "
+                "is its own answer about whose group he was running with.")
+        return
+
+    # his chances, summed over every team-unit he appeared on (rarely more than one)
+    rows = []
+    for (team_id, side), _ in me_all.groupby(["teamId", "side"]):
+        mat = chances_matrix(pp_all, team_id, side, col, window, picked)
+        if player_name in mat.index:
+            rows.append(mat.loc[player_name])
+    chances = pd.concat(rows, axis=1).sum(axis=1) if rows else pd.Series(dtype="int64")
+
+    split = pd.concat([mine.groupby(col)["nflPlayId"].size().rename("Played"),
+                       chances.rename("Chances")], axis=1).fillna(0).astype(int)
+    ordered = [b for b in (order or sorted(split.index)) if b in split.index]
+    split = split.loc[ordered + [b for b in split.index if b not in ordered]]
+    split["Share %"] = (100 * split["Played"] /
+                        split["Chances"].where(split["Chances"] > 0)).round(1)
+    total = int(split["Chances"].sum())
+    overall = round(100 * len(mine) / max(total, 1), 1)
+    st.caption(f"Overall he played {len(mine)} of the {total} snaps that were his to "
+               f"play ({overall}%) — the dashed line below. A blank share means no "
+               f"chances came up, which is not a zero.")
+
+    plot = split.reset_index().rename(columns={col: "Bucket"})
+    plot["Bucket"] = plot["Bucket"].astype(str)
+    bars = alt.Chart(plot[plot["Chances"] > 0]).mark_bar().encode(
+        x=alt.X("Bucket:N", sort=list(plot["Bucket"]), title=None,
+                axis=alt.Axis(labelAngle=-30)),
+        y=alt.Y("Share %:Q", title="% of his chances he played",
+                scale=alt.Scale(domain=[0, 100])),
+        tooltip=["Bucket", "Played", "Chances", "Share %"])
+    rule = alt.Chart(pd.DataFrame({"y": [overall]})).mark_rule(
+        strokeDash=[5, 5], color="#888").encode(y="y:Q")
+    st.altair_chart((bars + rule).properties(height=300), **WIDE)
+    st.dataframe(split.reset_index().rename(columns={col: split_name}),
+                 **WIDE, hide_index=True)
 
 
 # ---------- Sidebar ----------
@@ -1012,7 +1218,7 @@ if not player_name:
     st.caption("Pick a player to view results.")
     st.stop()
 
-plays_pr, pp_pr, unit_sizes = scoped(data_dir, weeks_selected, sit)
+plays_pr, pp_pr, unit_sizes, pp_all = scoped(data_dir, weeks_selected, sit)
 
 me = pp_pr[pp_pr["playerName"].str.lower() == player_name.lower()]
 if me.empty:
@@ -1194,48 +1400,7 @@ with tab_start:
 
 # ---------- Situations ----------
 with tab_sit:
-    if not has_situation(pp_pr):
-        st.info("This season's CSVs have no down & distance yet. Run "
-                "`python backfill_situations.py`, then the preprocess step.")
-    else:
-        st.caption("How his playing time splits by situation. **Unit snaps** = every "
-                   "snap his unit played in that bucket in the games he was active "
-                   "for · **Share %** = how many of those he was on the field for. A "
-                   "share well above his overall number means he's a specialist for "
-                   "that situation; well below means he comes off in it.")
-        split_name = st.radio("Split by", list(SPLITS), horizontal=True,
-                              key="psit_split")
-        col, order = SPLITS[split_name]
-
-        my_units = me[["gameId", "teamId", "side"]].drop_duplicates()
-        unit_plays = pp_pr.merge(my_units, on=["gameId", "teamId", "side"])
-        unit_plays = unit_plays.drop_duplicates(["gameId", "nflPlayId", "teamId", "side"])
-        split = pd.concat(
-            [me.groupby(col)["nflPlayId"].size().rename("His snaps"),
-             unit_plays.groupby(col)["nflPlayId"].size().rename("Unit snaps")],
-            axis=1).fillna(0).astype(int)
-        rows = [b for b in (order or sorted(split.index)) if b in split.index]
-        rows += [b for b in split.index if b not in rows]
-        split = split.loc[rows]
-        split["Share %"] = (100 * split["His snaps"] /
-                            split["Unit snaps"].where(split["Unit snaps"] > 0)).round(1)
-        overall = round(100 * len(me) / max(len(unit_plays), 1), 1)
-        st.caption(f"Overall he played {len(me)} of his unit's {len(unit_plays)} "
-                   f"pass/rush snaps ({overall}%) — the dashed line below.")
-
-        plot = split.reset_index().rename(columns={col: "Bucket"})
-        plot["Bucket"] = plot["Bucket"].astype(str)
-        bars = alt.Chart(plot).mark_bar().encode(
-            x=alt.X("Bucket:N", sort=list(plot["Bucket"]), title=None,
-                    axis=alt.Axis(labelAngle=-30)),
-            y=alt.Y("Share %:Q", title="% of unit snaps he played",
-                    scale=alt.Scale(domain=[0, 100])),
-            tooltip=["Bucket", "His snaps", "Unit snaps", "Share %"])
-        rule = alt.Chart(pd.DataFrame({"y": [overall]})).mark_rule(
-            strokeDash=[5, 5], color="#888").encode(y="y:Q")
-        st.altair_chart((bars + rule).properties(height=300), **WIDE)
-        st.dataframe(split.reset_index().rename(columns={col: split_name}),
-                     **WIDE, hide_index=True)
+    render_player_situations(pp_all, player_name, sit)
 
 # ---------- Weekly Trend ----------
 with tab_week:
