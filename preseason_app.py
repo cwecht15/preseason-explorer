@@ -148,6 +148,15 @@ def game_labels(pp_pr):
     return label
 
 # ---------- 2026 update pipeline (local only) ----------
+# Fresh data reaches the hosted app only by being committed and pushed: Cloud
+# serves the CSVs out of this repo, and its own filesystem is wiped on every
+# restart. So the whole loop — paste auth, fetch, publish — runs from a local
+# `streamlit run`, and step 3 is what the hosted app actually sees.
+PUBLISH_PATHS = ["data_2026", "games_2026", "teams.csv", "hc_by_season.csv",
+                 "starter_summary.csv", "starter_trends.csv",
+                 "starter_players.csv", "starter_weekly.csv"]
+
+
 def running_locally():
     """Streamlit Community Cloud serves the repo out of /mount/src. The hosted
     app is public, so the auth box and the fetch buttons stay local-only."""
@@ -162,6 +171,62 @@ def run_script(script, tail=1500):
     return r.returncode == 0
 
 
+def git(*args):
+    """Run git in APP_DIR -> (ok, combined output)."""
+    try:
+        r = subprocess.run(["git", *args], cwd=APP_DIR, capture_output=True, text=True)
+    except OSError as e:
+        return False, f"git isn't available here ({e})"
+    return r.returncode == 0, (r.stdout + r.stderr).strip()
+
+
+def publish_status():
+    """Is any pipeline output still sitting on this machine only?"""
+    # -uall lists new game files one by one instead of collapsing them into
+    # "games_2026/", so the count below means something.
+    ok, out = git("status", "--porcelain", "-uall", "--", *PUBLISH_PATHS)
+    if not ok:
+        return {"state": "nogit", "short": "git unavailable", "files": [],
+                "message": f"Can't run git here, so publishing has to be manual. ({out[:120]})"}
+    # "XY path" -- split rather than slice, since git() has stripped the leading
+    # status column off the first line.
+    files = [line.split(maxsplit=1)[-1] for line in out.splitlines() if line.strip()]
+    ok_ahead, ahead_out = git("rev-list", "--count", "@{upstream}..HEAD")
+    ahead = int(ahead_out) if ok_ahead and ahead_out.isdigit() else 0
+    if files:
+        return {"state": "dirty", "short": f"{len(files)} file(s) to publish", "files": files,
+                "message": f"{len(files)} data file(s) changed on this machine. The hosted "
+                           "app keeps showing the old numbers until you publish."}
+    if ahead:
+        return {"state": "ahead", "short": f"{ahead} commit(s) to push", "files": [],
+                "message": f"{ahead} local commit(s) haven't reached origin/main yet."}
+    return {"state": "clean", "short": "published", "files": [],
+            "message": "The hosted app already has everything on this machine."}
+
+
+def publish_data(files):
+    """Commit the pipeline outputs and push to origin/main. -> (ok, message)"""
+    if files:
+        present = [p for p in PUBLISH_PATHS if os.path.exists(os.path.join(APP_DIR, p))]
+        ok, out = git("add", "--", *present)
+        if not ok:
+            return False, f"git add failed:\n{out}"
+        ok, out = git("commit", "-m", f"data: update 2026 preseason ({len(files)} file(s))")
+        if not ok:
+            return False, f"git commit failed:\n{out}"
+    ok, out = git("push")
+    if not ok:
+        low = out.lower()
+        if "rejected" in low or "non-fast-forward" in low:
+            out += ("\n\nThe remote has commits you don't. Run `git pull --rebase` "
+                    "in this folder, then publish again.")
+        elif "authentication" in low or "could not read" in low or "denied" in low:
+            out += ("\n\nGit couldn't authenticate to GitHub. Push once from a "
+                    "terminal to refresh your saved credentials, then try again.")
+        return False, f"git push failed:\n{out}"
+    return True, "Pushed to origin/main. Streamlit Cloud redeploys on its own, usually within a minute or two."
+
+
 def render_update_panel():
     # imported lazily: fetch_2026 needs `requests`, which the hosted app skips
     if APP_DIR not in sys.path:
@@ -172,8 +237,26 @@ def render_update_panel():
     icon = {"ok": "✅", "unknown": "❔", "expired": "⛔",
             "missing": "⚠️", "unparsed": "⚠️"}[status["state"]]
     stale = status["state"] in ("expired", "missing", "unparsed")
+    pub = publish_status()
 
-    with st.sidebar.expander(f"⬇️ Update 2026 data — {icon} {status['short']}", expanded=stale):
+    # The header says which step is waiting on you, so the sidebar answers
+    # "what do I have to do?" without being opened.
+    # Unpublished data outranks a dead token: it means the hosted app is
+    # actively showing something older than what's on this machine.
+    if pub["state"] in ("dirty", "ahead"):
+        head = f"📤 step 3: {pub['short']}"
+    elif stale:
+        head = f"{icon} step 1: new token needed"
+    else:
+        head = f"✅ ready — token {status['short']}"
+
+    with st.sidebar.expander(f"⬇️ Update 2026 data — {head}",
+                             expanded=stale or pub["state"] == "dirty"):
+        st.caption("Run all three steps here. Nothing you fetch shows up on the "
+                   "hosted app until step 3 pushes it — Streamlit Cloud reads the "
+                   "data out of the repo, not off this machine.")
+
+        st.markdown(f"**1 · NFL Pro token** — {icon} {status['short']}")
         st.caption(status["message"])
 
         # Paste box. The key carries a nonce so saving can blank the widget —
@@ -205,8 +288,12 @@ def render_update_panel():
             st.success(f"Auth saved. {saved}")
 
         st.divider()
-        if st.button("Fetch new games", disabled=stale, **WIDE,
-                     help="Paste a fresh auth first" if stale else
+        st.markdown("**2 · Fetch new games**")
+        st.caption("Downloads any completed preseason game you don't have yet into "
+                   "games_2026/, then rebuilds data_2026/*.csv. Games already on "
+                   "disk are skipped, so re-running is cheap.")
+        if st.button("Fetch + preprocess", disabled=stale, **WIDE,
+                     help="Refresh the token first (step 1)" if stale else
                           "Runs fetch_2026.py, then preprocess_2026.py"):
             with st.status("Fetching from pro.nfl.com…", expanded=True) as box:
                 if not run_script("fetch_2026.py"):
@@ -214,8 +301,31 @@ def render_update_panel():
                 elif not run_script("preprocess_2026.py", tail=800):
                     box.update(label="Preprocess failed — see output above", state="error")
                 else:
-                    box.update(label="Data updated", state="complete")
+                    box.update(label="Data updated — now publish it (step 3)", state="complete")
                     st.cache_data.clear()
+
+        st.divider()
+        # recomputed: a fetch in this same run may have just changed the answer
+        pub = publish_status()
+        st.markdown(f"**3 · Publish to the hosted app** — {pub['short']}")
+        st.caption(pub["message"])
+        if pub["files"]:
+            st.code("\n".join(pub["files"][:8]) +
+                    (f"\n… and {len(pub['files']) - 8} more" if len(pub["files"]) > 8 else ""))
+        done = st.session_state.pop("publish_done", None)
+        if done:
+            st.success(done)
+        can_publish = pub["state"] in ("dirty", "ahead")
+        if st.button("Commit + push", disabled=not can_publish, **WIDE,
+                     help="Nothing new to publish" if not can_publish else
+                          "git add + commit + push origin/main"):
+            with st.spinner("Publishing…"):
+                ok, msg = publish_data(pub["files"])
+            if ok:
+                st.session_state["publish_done"] = msg
+                st.rerun()
+            else:
+                st.error(msg)
 
 
 # ---------- Starter Trends view ----------

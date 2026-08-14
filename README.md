@@ -18,15 +18,38 @@ rotations. Hosted on Streamlit Community Cloud.
 All from the pro.nfl.com API. Only the play-list endpoint needs an NFL Pro
 login: paste a Chrome "Copy as cURL" into `auth.txt` (gitignored).
 
-The bearer token in that paste is a JWT that lasts about an hour, so it is
-usually the thing that's broken. Easiest path is the sidebar's **⬇️ Update 2026
-data** panel, whose header reads the token's `exp` claim and shows the time left
-("✅ 41m left" / "⛔ expired 1d 2h ago"). Paste a fresh Copy-as-cURL there and hit
-Save — it validates before writing, so a junk or already-dead paste can't
-overwrite a working `auth.txt`. **Test auth** spends one real request against
-the secured endpoint; **Fetch new games** stays disabled until the auth is good.
+### Updating the data
+
+Run the local app (`streamlit run preseason_app.py`) and use the sidebar's
+**⬇️ Update 2026 data** panel. Its header always names the step that's waiting
+on you — `⛔ step 1: new token needed`, `📤 step 3: 4 file(s) to publish`, or
+`✅ ready`. All three steps have to happen on your machine: Streamlit Cloud
+serves the CSVs committed to this repo and wipes its own filesystem on restart,
+so nothing you fetch there would survive or be visible anyway.
+
+1. **NFL Pro token.** The Authorization bearer is a JWT good for about an hour,
+   so it's usually what's broken. On pro.nfl.com while logged in: DevTools →
+   Network → click any `/api/secured/…` request → right-click → Copy → Copy as
+   cURL, paste it in the box, **Save auth**. The paste is validated before it's
+   written, so junk or an already-dead token can't clobber a working
+   `auth.txt`. **Test auth** spends one real request for a definitive answer.
+2. **Fetch + preprocess.** Runs `fetch_2026.py` then `preprocess_2026.py`.
+   Games already in `games_2026/` are skipped, so re-running is cheap.
+   Disabled while the token is bad.
+3. **Commit + push.** Commits the changed data files and pushes to
+   `origin/main`, which is what makes the hosted app redeploy. Until you do
+   this the hosted app still shows the old numbers. If the push is rejected
+   because the remote moved on, `git pull --rebase` here and publish again.
+
 The panel is hidden when the app runs on Streamlit Cloud (see
-`running_locally()`), since that deployment is public.
+`running_locally()`), since that deployment is public — a token box on it would
+be a token box for anyone who finds the URL.
+
+Unattended updates (a cron/Action refreshing the data on its own) aren't
+possible as things stand: the token dies after an hour, so a stored secret
+would always be stale by the next run.
+
+The same pipeline by hand:
 
 ```
 python fetch_2026.py               # preseason game JSONs -> games_2026/
@@ -34,6 +57,7 @@ python preprocess_2026.py          # -> data_2026/ CSVs (side-repair included)
 python fetch_reg_wk1.py --season N # REG wk1 opening lineups (starter ground truth)
 python starter_trends.py           # starter usage per team-week (+ per starter)
 python starter_summary.py          # season summaries + coach join
+git add data_2026 games_2026 starter_*.csv && git commit -m "data: update" && git push
 ```
 
 Coach data comes from the local NFL_Data Postgres (`coaching` /
@@ -50,5 +74,5 @@ streamlit run preseason_app.py
 ```
 
 Deployed via Streamlit Community Cloud from this repo (main branch,
-`preseason_app.py`) — every push redeploys automatically. The in-app fetch
-buttons only work locally where `auth.txt` and the Postgres DB exist.
+`preseason_app.py`) — every push redeploys automatically. The update panel
+(auth / fetch / publish) is local-only; see "Updating the data" above.
