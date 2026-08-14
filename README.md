@@ -18,6 +18,16 @@ rotations. Hosted on Streamlit Community Cloud.
 All from the pro.nfl.com API. Only the play-list endpoint needs an NFL Pro
 login: paste a Chrome "Copy as cURL" into `auth.txt` (gitignored).
 
+The bearer token in that paste is a JWT that lasts about an hour, so it is
+usually the thing that's broken. Easiest path is the sidebar's **⬇️ Update 2026
+data** panel, whose header reads the token's `exp` claim and shows the time left
+("✅ 41m left" / "⛔ expired 1d 2h ago"). Paste a fresh Copy-as-cURL there and hit
+Save — it validates before writing, so a junk or already-dead paste can't
+overwrite a working `auth.txt`. **Test auth** spends one real request against
+the secured endpoint; **Fetch new games** stays disabled until the auth is good.
+The panel is hidden when the app runs on Streamlit Cloud (see
+`running_locally()`), since that deployment is public.
+
 ```
 python fetch_2026.py               # preseason game JSONs -> games_2026/
 python preprocess_2026.py          # -> data_2026/ CSVs (side-repair included)

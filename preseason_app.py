@@ -147,6 +147,77 @@ def game_labels(pp_pr):
         return f"Wk {weeks_by_game.get(game_id, '?')} vs {opp}"
     return label
 
+# ---------- 2026 update pipeline (local only) ----------
+def running_locally():
+    """Streamlit Community Cloud serves the repo out of /mount/src. The hosted
+    app is public, so the auth box and the fetch buttons stay local-only."""
+    here = os.path.abspath(APP_DIR).replace("\\", "/")
+    return not here.startswith(("/mount/src", "/app"))
+
+
+def run_script(script, tail=1500):
+    r = subprocess.run([sys.executable, script], cwd=APP_DIR,
+                       capture_output=True, text=True)
+    st.code((r.stdout + r.stderr)[-tail:] or "(no output)")
+    return r.returncode == 0
+
+
+def render_update_panel():
+    # imported lazily: fetch_2026 needs `requests`, which the hosted app skips
+    if APP_DIR not in sys.path:
+        sys.path.insert(0, APP_DIR)
+    from fetch_2026 import auth_status, check_auth_live, save_auth_text
+
+    status = auth_status()
+    icon = {"ok": "✅", "unknown": "❔", "expired": "⛔",
+            "missing": "⚠️", "unparsed": "⚠️"}[status["state"]]
+    stale = status["state"] in ("expired", "missing", "unparsed")
+
+    with st.sidebar.expander(f"⬇️ Update 2026 data — {icon} {status['short']}", expanded=stale):
+        st.caption(status["message"])
+
+        # Paste box. The key carries a nonce so saving can blank the widget —
+        # Streamlit forbids writing to a widget's state after it is drawn.
+        nonce = st.session_state.get("auth_nonce", 0)
+        pasted = st.text_area(
+            "NFL Pro auth", key=f"auth_paste_{nonce}", height=110,
+            placeholder="curl 'https://pro.nfl.com/api/secured/...' -H 'Cookie: ...' …",
+            help="pro.nfl.com logged in → DevTools → Network → click any "
+                 "/api/secured/… request → right-click → Copy → Copy as cURL. "
+                 "The token is good for about an hour.")
+
+        c1, c2 = st.columns(2)
+        if c1.button("Save auth", disabled=not pasted.strip(), **WIDE):
+            ok, msg = save_auth_text(pasted)
+            if ok:
+                st.session_state["auth_nonce"] = nonce + 1  # clears the paste box
+                st.session_state.pop(f"auth_paste_{nonce}", None)  # drop the token
+                st.session_state["auth_saved"] = msg
+                st.rerun()
+            else:
+                st.error(msg)
+        if c2.button("Test auth", **WIDE):
+            with st.spinner("Asking pro.nfl.com…"):
+                ok, msg = check_auth_live()
+            (st.success if ok else st.error)(msg)
+        saved = st.session_state.pop("auth_saved", None)
+        if saved:
+            st.success(f"Auth saved. {saved}")
+
+        st.divider()
+        if st.button("Fetch new games", disabled=stale, **WIDE,
+                     help="Paste a fresh auth first" if stale else
+                          "Runs fetch_2026.py, then preprocess_2026.py"):
+            with st.status("Fetching from pro.nfl.com…", expanded=True) as box:
+                if not run_script("fetch_2026.py"):
+                    box.update(label="Fetch failed — see output above", state="error")
+                elif not run_script("preprocess_2026.py", tail=800):
+                    box.update(label="Preprocess failed — see output above", state="error")
+                else:
+                    box.update(label="Data updated", state="complete")
+                    st.cache_data.clear()
+
+
 # ---------- Starter Trends view ----------
 TREND_FILES = ["starter_summary.csv", "starter_trends.csv",
                "starter_players.csv", "hc_by_season.csv"]
@@ -464,32 +535,8 @@ if st.sidebar.button("🔄 Refresh data (clear cache)"):
     st.rerun()
 
 # ---------- Sidebar: update pipeline ----------
-fetch_script = os.path.join(APP_DIR, "fetch_2026.py")
-if os.path.exists(fetch_script):
-    with st.sidebar.expander("⬇️ Update 2026 data"):
-        st.caption("Runs fetch_2026.py + preprocess_2026.py. Needs a fresh "
-                   "auth.txt (Copy as cURL from pro.nfl.com) — the token "
-                   "expires after a few hours.")
-        if st.button("Fetch new games"):
-            with st.status("Fetching from pro.nfl.com…", expanded=True) as status:
-                r = subprocess.run([sys.executable, "fetch_2026.py"],
-                                   cwd=APP_DIR, capture_output=True, text=True)
-                st.code((r.stdout + r.stderr)[-1500:] or "(no output)")
-                out = (r.stdout + r.stderr).lower()
-                if r.returncode != 0:
-                    if "auth" in out or "401" in out:
-                        status.update(label="Auth expired — re-paste Copy-as-cURL into auth.txt", state="error")
-                    else:
-                        status.update(label="Fetch failed — see output above", state="error")
-                else:
-                    r2 = subprocess.run([sys.executable, "preprocess_2026.py"],
-                                        cwd=APP_DIR, capture_output=True, text=True)
-                    st.code((r2.stdout + r2.stderr)[-800:] or "(no output)")
-                    if r2.returncode != 0:
-                        status.update(label="Preprocess failed — see output above", state="error")
-                    else:
-                        status.update(label="Data updated", state="complete")
-                        st.cache_data.clear()
+if running_locally() and os.path.exists(os.path.join(APP_DIR, "fetch_2026.py")):
+    render_update_panel()
 
 if view == "Team Explorer":
     try:

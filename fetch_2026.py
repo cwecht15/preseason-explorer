@@ -9,6 +9,8 @@ public. To supply auth, open pro.nfl.com in Chrome while logged in, open
 DevTools > Network, click any request to pro.nfl.com/api/..., right-click >
 Copy > Copy as cURL, and paste the whole thing into a file named auth.txt in
 this folder. This script pulls the Cookie and Authorization headers out of it.
+(The app's sidebar "Update 2026 data" panel does the same paste with a validity
+check; the Authorization bearer is a JWT good for about an hour.)
 
 Usage:
     python fetch_2026.py            # fetch all completed 2026 preseason games
@@ -16,6 +18,8 @@ Usage:
 """
 
 import argparse
+import base64
+import datetime
 import json
 import os
 import re
@@ -52,11 +56,8 @@ PLAY_TYPE_MAP = {
 }
 
 
-def load_auth_headers():
+def parse_auth_headers(text):
     """Parse Cookie / Authorization headers out of a pasted 'Copy as cURL'."""
-    if not os.path.exists(AUTH_FILE):
-        return None
-    text = open(AUTH_FILE, encoding="utf-8", errors="replace").read()
     if '^"' in text:  # "Copy as cURL (cmd)" caret-escaping: ^X means literal X
         text = re.sub(r"\^(.)", r"\1", text.replace("^\n", "\n"))
     headers = {}
@@ -75,6 +76,122 @@ def load_auth_headers():
         if m and m.group(1).title() not in headers:
             headers[m.group(1).title()] = m.group(2).strip()
     return headers or None
+
+
+def load_auth_headers():
+    """Cookie / Authorization headers from auth.txt, or None."""
+    if not os.path.exists(AUTH_FILE):
+        return None
+    return parse_auth_headers(open(AUTH_FILE, encoding="utf-8", errors="replace").read())
+
+
+# ---------- Auth freshness ----------
+# The Cookie jar outlives the session, but the Authorization bearer is a JWT
+# that pro.nfl.com issues with roughly a one-hour life. Reading its `exp` claim
+# tells us the token is dead without spending a request to find out.
+
+def jwt_expiry(token):
+    """Unix `exp` out of a JWT payload, or None if it isn't a readable JWT."""
+    parts = token.split(".")
+    if len(parts) != 3:
+        return None
+    try:
+        payload = parts[1] + "=" * (-len(parts[1]) % 4)
+        claims = json.loads(base64.urlsafe_b64decode(payload))
+    except Exception:
+        return None
+    exp = claims.get("exp")
+    return float(exp) if isinstance(exp, (int, float)) else None
+
+
+def format_duration(seconds):
+    seconds = int(abs(seconds))
+    if seconds < 60:
+        return f"{seconds}s"
+    if seconds < 3600:
+        return f"{seconds // 60}m"
+    if seconds < 86400:
+        return f"{seconds // 3600}h {(seconds % 3600) // 60}m"
+    return f"{seconds // 86400}d {(seconds % 86400) // 3600}h"
+
+
+def auth_status(headers=None):
+    """State of the stored auth: dict(state, message, short, seconds_left).
+
+    state is one of: missing, unparsed, expired, ok, unknown (no readable JWT,
+    so freshness can only be settled by actually calling the API).
+    """
+    if headers is None:
+        if not os.path.exists(AUTH_FILE):
+            return {"state": "missing", "seconds_left": None,
+                    "short": "no auth.txt",
+                    "message": f"No {AUTH_FILE} yet - paste a Copy-as-cURL to create it."}
+        headers = load_auth_headers()
+    if not headers:
+        return {"state": "unparsed", "seconds_left": None,
+                "short": "unreadable",
+                "message": f"{AUTH_FILE} has no Cookie or Authorization header in it."}
+
+    bearer = (headers.get("Authorization") or "").split()
+    exp = jwt_expiry(bearer[-1]) if bearer else None
+    if exp is None:
+        return {"state": "unknown", "seconds_left": None,
+                "short": "age unknown",
+                "message": "Auth loaded, but no readable token expiry - test it to be sure."}
+
+    left = exp - datetime.datetime.now(datetime.timezone.utc).timestamp()
+    when = datetime.datetime.fromtimestamp(exp).strftime("%a %H:%M")
+    if left <= 0:
+        return {"state": "expired", "seconds_left": left,
+                "short": f"expired {format_duration(left)} ago",
+                "message": f"Token expired {format_duration(left)} ago (at {when}). Paste a fresh Copy-as-cURL."}
+    return {"state": "ok", "seconds_left": left,
+            "short": f"{format_duration(left)} left",
+            "message": f"Token valid for another {format_duration(left)} (until {when})."}
+
+
+def save_auth_text(text):
+    """Validate a pasted Copy-as-cURL and write it to auth.txt. -> (ok, message)"""
+    headers = parse_auth_headers(text or "")
+    if not headers:
+        return False, ("Couldn't find a Cookie or Authorization header in that paste. "
+                       "Use right-click > Copy > Copy as cURL on a pro.nfl.com/api/... request.")
+    if "Authorization" not in headers:
+        return False, ("Found a Cookie but no Authorization header - copy a request to "
+                       "/api/secured/... , the public endpoints don't carry the token.")
+    status = auth_status(headers)
+    if status["state"] == "expired":  # refuse before writing, so a stale paste
+        return False, ("That token is already " + status["short"]  # can't clobber
+                       + " - copy a newer request.")               # a live one
+    with open(AUTH_FILE, "w", encoding="utf-8") as f:
+        f.write(text)
+    return True, status["message"]
+
+
+def check_auth_live(session=None):
+    """Actually call the secured endpoint once. -> (ok, message)"""
+    auth = load_auth_headers()
+    if not auth:
+        return False, auth_status()["message"]
+    session = session or requests.Session()
+    try:
+        data = get_json(session, f"{BASE}/api/scores/live/games",
+                        params={"season": SEASON, "seasonType": "PRE", "week": 1})
+        games = (data or {}).get("games", [])
+        done = [g for g in games if g.get("gameState") == "POST" or g.get("phase") == "FINAL"]
+        if not done:
+            return False, "No completed game available to test against."
+        h = dict(HEADERS)
+        h.update(auth)
+        r = session.get(f"{BASE}/api/secured/plays/playlist/game",
+                        params={"gameId": done[0]["gameId"]}, headers=h, timeout=30)
+    except requests.RequestException as e:
+        return False, f"Couldn't reach pro.nfl.com: {e}"
+    if r.status_code == 200:
+        return True, "pro.nfl.com accepted the token - ready to fetch."
+    if r.status_code in (401, 403):
+        return False, f"pro.nfl.com rejected the token ({r.status_code}) - paste a fresh Copy-as-cURL."
+    return False, f"Unexpected response from pro.nfl.com: {r.status_code}."
 
 
 def get_json(session, url, params=None, extra_headers=None, retries=3):
@@ -203,12 +320,13 @@ def main():
     ap.add_argument("--week", type=int, default=None, help="preseason week (0=HOF)")
     args = ap.parse_args()
 
-    auth = load_auth_headers()
-    if not auth:
-        print(f"No {AUTH_FILE} found (or no Cookie/Authorization in it).")
+    status = auth_status()
+    print(f"auth: {status['message']}")
+    if status["state"] not in ("ok", "unknown"):
         print("The play-list endpoint needs your NFL Pro login. See the")
         print("docstring at the top of this script for how to create auth.txt.")
         sys.exit(1)
+    auth = load_auth_headers()
 
     os.makedirs(OUT_DIR, exist_ok=True)
     session = requests.Session()
