@@ -250,7 +250,8 @@ def render_update_panel():
     # imported lazily: fetch_2026 needs `requests`, which the hosted app skips
     if APP_DIR not in sys.path:
         sys.path.insert(0, APP_DIR)
-    from fetch_2026 import auth_status, check_auth_live, save_auth_text
+    from fetch_2026 import (auth_status, check_auth_live, parse_auth_headers,
+                            save_auth_text)
 
     status = auth_status()
     icon = {"ok": "✅", "unknown": "❔", "expired": "⛔",
@@ -288,8 +289,13 @@ def render_update_panel():
                  "/api/secured/… request → right-click → Copy → Copy as cURL. "
                  "The token is good for about an hour.")
 
+        unsaved = bool(pasted.strip())
+        if unsaved:
+            st.warning("This paste isn't saved yet — **Save auth** writes it to auth.txt.")
+
         c1, c2 = st.columns(2)
-        if c1.button("Save auth", disabled=not pasted.strip(), **WIDE):
+        if c1.button("Save auth", disabled=not unsaved, **WIDE,
+                     type="primary" if unsaved else "secondary"):
             ok, msg = save_auth_text(pasted)
             if ok:
                 st.session_state["auth_nonce"] = nonce + 1  # clears the paste box
@@ -298,10 +304,21 @@ def render_update_panel():
                 st.rerun()
             else:
                 st.error(msg)
-        if c2.button("Test auth", **WIDE):
-            with st.spinner("Asking pro.nfl.com…"):
-                ok, msg = check_auth_live()
-            (st.success if ok else st.error)(msg)
+        # Tests the paste when there is one -- testing the saved file while an
+        # unsaved paste sits in the box just reports on the token being replaced.
+        if c2.button("Test auth", **WIDE,
+                     help="Checks the paste above, or the saved auth.txt if the box is empty"):
+            probe = parse_auth_headers(pasted) if unsaved else None
+            if unsaved and not probe:
+                st.error("No Cookie or Authorization header in that paste — recopy it "
+                         "with right-click > Copy > Copy as cURL.")
+            else:
+                with st.spinner("Asking pro.nfl.com…"):
+                    ok, msg = check_auth_live(probe)
+                if probe:
+                    msg = ("That paste works — hit Save auth to keep it. " if ok
+                           else "That paste was rejected: ") + msg
+                (st.success if ok else st.error)(msg)
         saved = st.session_state.pop("auth_saved", None)
         if saved:
             st.success(f"Auth saved. {saved}")

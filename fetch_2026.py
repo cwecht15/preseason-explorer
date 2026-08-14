@@ -168,9 +168,13 @@ def save_auth_text(text):
     return True, status["message"]
 
 
-def check_auth_live(session=None):
-    """Actually call the secured endpoint once. -> (ok, message)"""
-    auth = load_auth_headers()
+def check_auth_live(headers=None, session=None):
+    """Actually call the secured endpoint once. -> (ok, message)
+
+    Pass headers to test a paste that hasn't been saved yet; omit to test
+    whatever is currently in auth.txt.
+    """
+    auth = headers or load_auth_headers()
     if not auth:
         return False, auth_status()["message"]
     session = session or requests.Session()
