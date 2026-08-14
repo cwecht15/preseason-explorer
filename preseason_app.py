@@ -420,6 +420,15 @@ def situation_controls(plays_df):
     return sit
 
 
+def buckets_faced(unit_snaps, col, order):
+    """(order kept to what this unit actually saw, the rest) — the rest is
+    reported rather than dropped silently."""
+    if not order:
+        return None, []
+    seen = set(unit_snaps[col])
+    return [b for b in order if b in seen], [b for b in order if b not in seen]
+
+
 def split_table(pp, split_col, order, unit_snaps_by_bucket, mode, chances=None):
     """Players (rows) x situation buckets (columns).
 
@@ -429,9 +438,14 @@ def split_table(pp, split_col, order, unit_snaps_by_bucket, mode, chances=None):
     """
     mat = pp.pivot_table(index="playerName", columns=split_col, values="nflPlayId",
                          aggfunc="count", fill_value=0)
-    known = [c for c in (order or sorted(mat.columns)) if c in mat.columns and c != "?"]
+    # `order` is the buckets the unit actually faced, so they survive here even
+    # when this slice has none of them: a goal-line column that disappears
+    # because one QB never saw one reads as "that never happens", which is the
+    # same lie 0/0 exists to stop telling. Callers name what they dropped.
+    known = [c for c in (order or sorted(mat.columns)) if c != "?"]
     extra = [c for c in mat.columns if c not in known and c != "?"]
-    mat = mat[known + extra + (["?"] if "?" in mat.columns else [])]
+    mat = mat.reindex(columns=known + extra + (["?"] if "?" in mat.columns else []),
+                      fill_value=0)
     totals = mat.sum(axis=1)
     if mode == "share":
         denom = unit_snaps_by_bucket.reindex(mat.columns).fillna(0)
@@ -1034,6 +1048,8 @@ def render_team_explorer(data_dir, weeks_selected, season, sit):
             st.info("No snaps for that unit.")
             return
 
+        unit_snaps = sd.drop_duplicates(["gameId", "nflPlayId"])
+        order, never = buckets_faced(unit_snaps, col, order)
         units = sd[["gameId", "nflPlayId", "teamId", "side"]].drop_duplicates()
         qb_plays, qb_counts = qb_options(pp_all, units)
         c3, c4, c5 = st.columns(3)
@@ -1074,8 +1090,15 @@ def render_team_explorer(data_dir, weeks_selected, season, sit):
 
         unit_by_bucket = (sd.drop_duplicates(["gameId", "nflPlayId"])
                           .groupby(col)["nflPlayId"].size())
+        if order:  # keep the zeros visible here too, in the split's own order
+            unit_by_bucket = unit_by_bucket.reindex(
+                list(order) + [b for b in unit_by_bucket.index if b not in order],
+                fill_value=0)
         st.caption(("Unit snaps" if qb_pick == "Any QB" else f"Snaps with {qb_pick} in")
                    + " — " + " · ".join(f"{k}: {v}" for k, v in unit_by_bucket.items()))
+        if never:
+            st.caption("No column for " + ", ".join(never) + " — this unit never "
+                       "faced one in the selected weeks.")
         if mode == "chances":
             st.caption(f"**played / chances**, where a chance is a snap on a "
                        f"{'drive he played in' if window == 'drives' else 'play inside his window'}"
@@ -1129,6 +1152,13 @@ def render_player_situations(pp_all, player_name, sit):
     picked = qb_plays[qb_plays["QB"] == qb_pick][["gameId", "nflPlayId"]] \
         if qb_pick != "Any QB" else None
 
+    # rows for everything his unit faced, not just what reached his drives -
+    # "his unit had three goal-line snaps and he was on for none" is the answer
+    unit_snaps = (pp_all.merge(me_all[["gameId", "teamId", "side"]].drop_duplicates(),
+                               on=["gameId", "teamId", "side"])
+                  .drop_duplicates(["gameId", "nflPlayId", "teamId", "side"]))
+    order, never = buckets_faced(unit_snaps, col, order)
+
     mine = me_all.merge(picked, on=["gameId", "nflPlayId"]) if picked is not None \
         else me_all
     if mine.empty:
@@ -1146,15 +1176,19 @@ def render_player_situations(pp_all, player_name, sit):
 
     split = pd.concat([mine.groupby(col)["nflPlayId"].size().rename("Played"),
                        chances.rename("Chances")], axis=1).fillna(0).astype(int)
-    ordered = [b for b in (order or sorted(split.index)) if b in split.index]
-    split = split.loc[ordered + [b for b in split.index if b not in ordered]]
+    # same as the team table: buckets he never saw stay as visible 0-of-0 rows
+    ordered = list(order) if order else sorted(split.index)
+    split = split.reindex(ordered + [b for b in split.index if b not in ordered],
+                          fill_value=0)
     split["Share %"] = (100 * split["Played"] /
                         split["Chances"].where(split["Chances"] > 0)).round(1)
     total = int(split["Chances"].sum())
     overall = round(100 * len(mine) / max(total, 1), 1)
     st.caption(f"Overall he played {len(mine)} of the {total} snaps that were his to "
                f"play ({overall}%) — the dashed line below. A blank share means no "
-               f"chances came up, which is not a zero.")
+               f"chances came up, which is not a zero."
+               + (" No row for " + ", ".join(never) + " — his unit never faced one."
+                  if never else ""))
 
     plot = split.reset_index().rename(columns={col: "Bucket"})
     plot["Bucket"] = plot["Bucket"].astype(str)
