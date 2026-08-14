@@ -7,11 +7,26 @@ rotations. Hosted on Streamlit Community Cloud.
 ## Views
 
 - **Player Explorer** — pick a player: co-players on the field, snap timeline,
-  QB-anchored usage, weekly snap share, raw play list with NFL Pro links.
+  QB-anchored usage, situational splits, weekly snap share, raw play list with
+  NFL Pro links.
 - **Team Explorer** — snap-count depth chart per unit, week-1 starter flags,
-  drive-by-drive rotation matrix.
+  drive-by-drive rotation matrix, and a Situations tab splitting every player's
+  snaps by down & distance, field zone or personnel.
 - **Starter Trends** — how much each team/coach plays its real week-1 starters,
   2024–2025, with a 2026 coach-by-coach outlook.
+
+### Situations
+
+The sidebar's **Situation** panel filters every view at once — pick a down, a
+distance bucket, a field zone or a personnel grouping and the depth chart,
+co-player counts, drive matrix and timelines all narrow to those snaps.
+
+Buckets are computed in the app, not baked into the CSVs, so the definitions
+are adjustable under *Definitions*: a passing down defaults to 3rd/4th & 5+ or
+2nd & 8+, short yardage to 2 or fewer, and those thresholds are sliders.
+Personnel is counted off the positions the NFL lists players at, not where they
+actually lined up — a fullback counts as an RB, a tackle-eligible package reads
+as six linemen — so "11 personnel" here means 1 RB and 1 TE by roster listing.
 
 ## Data pipeline
 
@@ -56,6 +71,7 @@ The same pipeline by hand:
 
 ```
 python fetch_2026.py               # preseason game JSONs -> games_2026/
+python backfill_situations.py      # down/distance onto game JSONs fetched before it existed
 python preprocess_2026.py          # -> data_2026/ CSVs (side-repair included)
 python fetch_reg_wk1.py --season N # REG wk1 opening lineups (starter ground truth)
 python starter_trends.py           # starter usage per team-week (+ per starter)
@@ -67,8 +83,17 @@ Coach data comes from the local NFL_Data Postgres (`coaching` /
 `coaching_current`) via `hc_by_season.csv`.
 
 Note: the 2024/2025 source JSONs label offense/defense by home/away, not
-possession — `preprocess_2026.py` repairs sides from the play descriptions.
-Raw 2025 game JSONs (57 MB) are not committed; refetch with the pipeline.
+possession — `preprocess_2026.py` repairs sides, preferring the API's
+`possessionTeamId` and falling back to parsing the play description for files
+that predate it. Raw 2025 game JSONs (57 MB) are not committed; refetch with
+the pipeline, then run `backfill_situations.py` to get down & distance on them.
+
+`summaryPlay` returns the situation (down, distance, field position, score,
+EPA) in the same response as the lineups, so `fetch_2026.py` keeps both and new
+games cost no extra requests. `backfill_situations.py` re-reads that endpoint
+for games already on disk; it needs no NFL Pro token — summaryPlay is public
+and every stored play carries its own URL — and skips plays it has already
+done, so re-running is cheap.
 
 ## Run
 

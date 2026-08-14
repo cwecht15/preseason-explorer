@@ -6,6 +6,7 @@ import sys
 import time
 
 import altair as alt
+import numpy as np
 import pandas as pd
 import streamlit as st
 
@@ -94,6 +95,15 @@ def build_scoped(data_dir, weeks_key, fingerprint=None):
     pp_pr = scope_weeks(pr_filter(pp), weeks).copy()
     pp_pr = pp_pr.drop_duplicates(["gameId", "nflPlayId", "playerName", "teamId", "side"])
 
+    # down/distance/personnel live on the play table only (play_players.csv is
+    # 22x bigger); join them on so every view can filter by situation
+    sit_cols = [c for c in SITUATION_COLS if c in plays_pr.columns]
+    if sit_cols:
+        pp_pr = pp_pr.merge(plays_pr[["gameId", "nflPlayId"] + sit_cols],
+                            on=["gameId", "nflPlayId"], how="left")
+    plays_pr = add_situation_labels(plays_pr, DEFAULT_SIT)
+    pp_pr = add_situation_labels(pp_pr, DEFAULT_SIT)
+
     # snap index: order of a unit's (team+side) PASS/RUSH snaps within a game
     unit = (pp_pr[["gameId", "teamId", "side", "nflPlayId"]]
             .drop_duplicates()
@@ -149,12 +159,215 @@ def game_labels(pp_pr):
         return f"Wk {weeks_by_game.get(game_id, '?')} vs {opp}"
     return label
 
+# ---------- Situations ----------
+# The CSVs carry the raw situation (down, distance, yards to the goal line,
+# personnel counts); the buckets live here so the thresholds stay adjustable
+# in the sidebar instead of being frozen into the data.
+SITUATION_COLS = ["down", "yardsToGo", "yardsToGoal", "isGoalToGo", "isRedzone",
+                  "offN", "offRB", "offTE", "offOL", "defN", "defDB"]
+ORDINALS = {1: "1st", 2: "2nd", 3: "3rd", 4: "4th"}
+# 8-10 and 11+ are split so a 1st & 10 doesn't sit in the same bucket as a
+# 3rd & 15 - on the downs where it matters, that's the whole distinction
+DIST_BUCKETS = ["1-3", "4-7", "8-10", "11+"]
+DOWN_DIST = [f"{ORDINALS[d]} & {b}" for d in (1, 2, 3, 4) for b in DIST_BUCKETS]
+CALLS = ["Short yardage", "Standard down", "Passing down"]
+ZONES = ["Goal line (≤5 / GTG)", "Red zone (6-20)", "Open field", "Backed up (own ≤10)"]
+DEF_PERSONNEL = ["Heavy (≤3 DB)", "Base (4 DB)", "Nickel (5 DB)", "Dime (6 DB)",
+                 "Quarter (7+ DB)"]
+# Football Outsiders' passing-down line, exposed so it can be argued with
+DEFAULT_SIT = {"pass_late": 5, "pass_second": 8, "short": 2,
+               "downs": [], "dists": [], "calls": [], "zones": [],
+               "off_pers": [], "def_pers": []}
+SPLITS = {"Down & distance": ("Down & distance", DOWN_DIST),
+          "Pass vs run down": ("Situation", CALLS),
+          "Field zone": ("Field zone", ZONES),
+          "Offense personnel": ("Off personnel", None),
+          "Defense personnel": ("Def personnel", DEF_PERSONNEL)}
+LABEL_COLS = ["Down & distance", "Situation", "Field zone",
+              "Off personnel", "Def personnel"]
+
+
+def has_situation(df):
+    """Do these CSVs carry down & distance at all? (pre-backfill data doesn't)"""
+    return "down" in df.columns and df["down"].notna().any()
+
+
+def _bools(df, col):
+    """CSV booleans, whatever dtype they survived the round trip as."""
+    if col not in df.columns:
+        return pd.Series(False, index=df.index)
+    return df[col].astype(str).str.lower().isin(["true", "1", "1.0", "yes"])
+
+
+def call_bucket(df, sit):
+    """Passing down / standard down / short yardage, at the given thresholds.
+
+    Split out from the rest because it's the only bucket the sidebar sliders
+    can move, so it's the only one worth recomputing when they do.
+    """
+    down = pd.to_numeric(df["down"], errors="coerce")
+    ytg = pd.to_numeric(df["yardsToGo"], errors="coerce")
+    # short yardage first: 3rd & 1 is a run down no matter what the down says
+    passing = ((down >= 3) & (ytg >= sit["pass_late"])) | \
+              ((down == 2) & (ytg >= sit["pass_second"]))
+    return np.select([ytg <= sit["short"], passing, down.notna()],
+                     [CALLS[0], CALLS[2], CALLS[1]], "?")
+
+
+def add_situation_labels(df, sit):
+    """Add the bucket columns every situational view splits on."""
+    out = df.copy()
+    if not has_situation(df):
+        for c in LABEL_COLS:
+            out[c] = "?"
+        return out
+
+    num = lambda c: pd.to_numeric(out[c], errors="coerce") if c in out else pd.Series(
+        float("nan"), index=out.index)
+    down, ytg, to_goal = num("down"), num("yardsToGo"), num("yardsToGoal")
+
+    dist = pd.Series(np.select([ytg <= 3, ytg <= 7, ytg <= 10, ytg.notna()],
+                               DIST_BUCKETS, "?"), index=out.index)
+    down_lab = down.map(ORDINALS)
+    out["Down & distance"] = (down_lab + " & " + dist).where(
+        down_lab.notna() & dist.ne("?"), "?")
+
+    out["Situation"] = call_bucket(out, sit)
+
+    goal = _bools(out, "isGoalToGo") | (to_goal <= 5)
+    red = _bools(out, "isRedzone") | (to_goal <= 20)
+    out["Field zone"] = np.select([goal, red, to_goal >= 90, to_goal.notna()],
+                                  [ZONES[0], ZONES[1], ZONES[3], ZONES[2]], "?")
+
+    rb, te, ol, off_n = num("offRB"), num("offTE"), num("offOL"), num("offN")
+    code = (rb.fillna(0).astype(int).astype(str) + te.fillna(0).astype(int).astype(str))
+    code = code + np.where(ol.eq(6), " (6 OL)", "")
+    out["Off personnel"] = np.where(off_n.eq(11) & rb.notna() & te.notna(), code, "?")
+
+    db, def_n = num("defDB"), num("defN")
+    ok = def_n.eq(11) & db.notna()
+    out["Def personnel"] = np.select(
+        [ok & (db <= 3), ok & db.eq(4), ok & db.eq(5), ok & db.eq(6), ok & (db >= 7)],
+        DEF_PERSONNEL, "?")
+    return out
+
+
+def situation_mask(df, sit):
+    """Boolean mask for the sidebar's situation picks (empty pick = no filter)."""
+    keep = pd.Series(True, index=df.index)
+    if sit is None:
+        return keep
+    if sit["downs"] and "down" in df:
+        keep &= pd.to_numeric(df["down"], errors="coerce").isin(sit["downs"])
+    if sit["dists"] and "Down & distance" in df:
+        keep &= df["Down & distance"].str.split(" & ").str[-1].isin(sit["dists"])
+    for picks, col in ((sit["calls"], "Situation"), (sit["zones"], "Field zone"),
+                       (sit["off_pers"], "Off personnel"),
+                       (sit["def_pers"], "Def personnel")):
+        if picks and col in df:
+            keep &= df[col].isin(picks)
+    return keep
+
+
+def situation_active(sit):
+    return bool(sit) and any(sit[k] for k in
+                             ("downs", "dists", "calls", "zones", "off_pers", "def_pers"))
+
+
+def unit_totals(pp):
+    """Snaps per team-unit in whatever slice of plays is passed in."""
+    return (pp[["gameId", "teamId", "side", "nflPlayId"]].drop_duplicates()
+            .groupby(["gameId", "teamId", "side"], as_index=False).size()
+            .rename(columns={"size": "unitSnaps"}))
+
+
+def scoped(data_dir, weeks_selected, sit):
+    """build_scoped + situation labels + the sidebar's situation filter.
+
+    Snap order and drive numbers stay on the full play list — a filtered view
+    should still say a player entered on his unit's 12th snap, not its 3rd.
+    """
+    plays_pr, pp_pr, unit_sizes = build_scoped(
+        data_dir, tuple(weeks_selected),
+        fingerprint=file_fingerprint(os.path.join(data_dir, "play_players.csv")))
+    # build_scoped labels at the default thresholds (it's cached); only the
+    # pass/run call moves when the sliders do, so that's all we redo here
+    if sit and any(sit[k] != DEFAULT_SIT[k] for k in ("pass_late", "pass_second", "short")):
+        plays_pr = plays_pr.assign(Situation=call_bucket(plays_pr, sit))
+        pp_pr = pp_pr.assign(Situation=call_bucket(pp_pr, sit))
+    if situation_active(sit):
+        plays_pr = plays_pr[situation_mask(plays_pr, sit)]
+        pp_pr = pp_pr[situation_mask(pp_pr, sit)]
+        unit_sizes = unit_totals(pp_pr)
+    return plays_pr, pp_pr, unit_sizes
+
+
+def situation_controls(plays_df):
+    """Sidebar situation picker. -> sit dict, or None when the data predates it."""
+    st.sidebar.header("Situation")
+    pr = pr_filter(plays_df)
+    if not has_situation(pr):
+        st.sidebar.caption("These CSVs have no down & distance yet — run "
+                           "`python backfill_situations.py`, then the fetch/preprocess "
+                           "step, to add it.")
+        return None
+
+    sit = dict(DEFAULT_SIT)
+    with st.sidebar.expander("Definitions"):
+        st.caption("Where the passing-down line sits. Defaults follow the usual "
+                   "convention: 3rd/4th & 5+, 2nd & 8+.")
+        sit["pass_late"] = st.slider("3rd/4th down is a passing down at", 3, 10, 5)
+        sit["pass_second"] = st.slider("2nd down is a passing down at", 5, 15, 8)
+        sit["short"] = st.slider("Short yardage is this or less", 1, 4, 2)
+
+    labeled = add_situation_labels(pr, sit)
+    off_opts = sorted(c for c in labeled["Off personnel"].unique() if c != "?")
+    with st.sidebar.expander("Filter snaps"):
+        st.caption("Leave a box empty to include everything. Filters apply to every "
+                   "view — co-players, depth chart, timelines and all.")
+        sit["downs"] = st.multiselect("Down", [1, 2, 3, 4],
+                                      format_func=lambda d: ORDINALS[d])
+        sit["dists"] = st.multiselect("Distance", DIST_BUCKETS)
+        sit["calls"] = st.multiselect("Down type", CALLS)
+        sit["zones"] = st.multiselect("Field zone", ZONES)
+        sit["off_pers"] = st.multiselect("Offense personnel", off_opts,
+                                         help="RB + TE count off the listed positions, "
+                                              "e.g. 11 = 1 RB, 1 TE, 3 WR.")
+        sit["def_pers"] = st.multiselect("Defense personnel", DEF_PERSONNEL)
+
+    if situation_active(sit):
+        kept = int(situation_mask(labeled, sit).sum())
+        st.sidebar.caption(f"⚑ Situation filter on — {kept} of {len(labeled)} "
+                           f"pass/rush plays ({100 * kept / max(len(labeled), 1):.0f}%).")
+    return sit
+
+
+def split_table(pp, split_col, order, unit_snaps_by_bucket, as_share):
+    """Players (rows) x situation buckets (columns), snaps or % of unit snaps."""
+    mat = pp.pivot_table(index="playerName", columns=split_col, values="nflPlayId",
+                         aggfunc="count", fill_value=0)
+    known = [c for c in (order or sorted(mat.columns)) if c in mat.columns and c != "?"]
+    extra = [c for c in mat.columns if c not in known and c != "?"]
+    mat = mat[known + extra + (["?"] if "?" in mat.columns else [])]
+    totals = mat.sum(axis=1)
+    if as_share:
+        denom = unit_snaps_by_bucket.reindex(mat.columns).fillna(0)
+        mat = (100 * mat.div(denom.where(denom > 0), axis=1)).round(1)
+    pos = (pp.groupby("playerName")["position"]
+           .agg(lambda s: s.mode().iat[0] if not s.mode().empty else "?"))
+    mat.insert(0, "Snaps", totals)
+    mat.insert(0, "Pos", mat.index.map(pos))
+    return mat.loc[totals.sort_values(ascending=False).index]
+
 # ---------- 2026 update pipeline (local only) ----------
 # Fresh data reaches the hosted app only by being committed and pushed: Cloud
 # serves the CSVs out of this repo, and its own filesystem is wiped on every
 # restart. So the whole loop — paste auth, fetch, publish — runs from a local
 # `streamlit run`, and step 3 is what the hosted app actually sees.
-PUBLISH_PATHS = ["data_2026", "games_2026", "teams.csv", "hc_by_season.csv",
+# "data" (the 2025 CSVs) is in here too — it barely ever changes, but when it
+# does, a publish that skipped it would leave the hosted app serving 2025 data
+# the local app has already moved past.
+PUBLISH_PATHS = ["data", "data_2026", "games_2026", "teams.csv", "hc_by_season.csv",
                  "starter_summary.csv", "starter_trends.csv",
                  "starter_players.csv", "starter_weekly.csv"]
 
@@ -599,16 +812,17 @@ def render_starter_trends():
 WEEK_NAMES = {0: "HOF", 1: "Wk 1", 2: "Wk 2", 3: "Wk 3"}
 
 
-def render_team_explorer(data_dir, weeks_selected, season):
+def render_team_explorer(data_dir, weeks_selected, season, sit):
     st.title("Team Explorer")
     st.caption("Snap-count depth chart from preseason PASS/RUSH plays. "
                "Lower avg entry snap = on the field earlier = higher on the depth chart.")
 
-    plays_pr, pp_pr, unit_sizes = build_scoped(
-        data_dir, tuple(weeks_selected),
-        fingerprint=file_fingerprint(os.path.join(data_dir, "play_players.csv")))
+    plays_pr, pp_pr, unit_sizes = scoped(data_dir, weeks_selected, sit)
+    if situation_active(sit):
+        st.info("⚑ Situation filter is on — every count below is snaps **in that "
+                "situation only**, including the depth chart and drive matrix.")
     if pp_pr.empty:
-        st.info("No data with the current week filter.")
+        st.info("No data with the current week and situation filter.")
         return
 
     team_ids = sorted(pp_pr["teamId"].unique(), key=team_label)
@@ -627,7 +841,7 @@ def render_team_explorer(data_dir, weeks_selected, season):
         starters = set(zip(sp["unit"], sp["playerName"]))
 
     tp = pp_pr[pp_pr["teamId"] == team]
-    tab_off, tab_def = st.tabs(["Offense", "Defense"])
+    tab_off, tab_def, tab_sit = st.tabs(["Offense", "Defense", "Situations"])
     for side, unit_name, tab in (("off", "offense", tab_off), ("def", "defense", tab_def)):
         with tab:
             sd = tp[tp["side"] == side]
@@ -704,6 +918,52 @@ def render_team_explorer(data_dir, weeks_selected, season):
                 st.caption(f"Drive lengths — {header}")
                 st.dataframe(mat, **WIDE, height=min(560, 40 + 35 * len(mat)))
 
+    # ---- who's on the field by situation ----
+    with tab_sit:
+        if not has_situation(tp):
+            st.info("This season's CSVs have no down & distance yet. Run "
+                    "`python backfill_situations.py`, then the preprocess step.")
+            return
+        st.caption("Every player's snaps broken out by the situation they were played "
+                   "in — the passing-down back, the base-defense-only linebacker, the "
+                   "goal-line tight end all show up here.")
+        c1, c2 = st.columns([1, 2])
+        with c1:
+            unit_name = st.radio("Unit", ["Offense", "Defense"], horizontal=True,
+                                 key="sit_unit")
+        with c2:
+            split_name = st.radio("Split by", list(SPLITS), horizontal=True,
+                                  key="sit_split")
+        side = "off" if unit_name == "Offense" else "def"
+        col, order = SPLITS[split_name]
+        sd = tp[tp["side"] == side]
+        if sd.empty:
+            st.info("No snaps for that unit.")
+            return
+        if split_name == "Offense personnel" and side == "def":
+            st.caption("Offense personnel on a defensive unit = the grouping they were "
+                       "sent out against.")
+        elif split_name == "Defense personnel" and side == "off":
+            st.caption("Defense personnel on an offensive unit = what the defense "
+                       "answered with.")
+
+        unit_by_bucket = (sd.drop_duplicates(["gameId", "nflPlayId"])
+                          .groupby(col)["nflPlayId"].size())
+        mode = st.radio("Show", ["Snaps", "% of the unit's snaps in that situation"],
+                        horizontal=True, key="sit_mode",
+                        help="Snaps = raw count. % = of every snap the unit played in "
+                             "that situation, how many he was out there for — the "
+                             "column to read when the buckets are different sizes.")
+        st.caption("Unit snaps — " + " · ".join(
+            f"{k}: {v}" for k, v in unit_by_bucket.items()))
+        mat = split_table(sd, col, order, unit_by_bucket,
+                          as_share=mode.startswith("%"))
+        st.dataframe(mat, **WIDE, height=min(620, 60 + 35 * len(mat)))
+        st.download_button("Download split (CSV)",
+                           mat.to_csv().encode("utf-8"),
+                           file_name=f"{team_label(team)}_{side}_{split_name}_{season}.csv",
+                           mime="text/csv", key="dl_sit")
+
 
 # ---------- Sidebar ----------
 view = st.sidebar.radio("View", ["Player Explorer", "Team Explorer", "Starter Trends"])
@@ -728,6 +988,8 @@ if st.sidebar.button("🔄 Refresh data (clear cache)"):
     st.cache_data.clear()
     st.rerun()
 
+sit = situation_controls(plays_df)
+
 # ---------- Sidebar: update pipeline ----------
 if running_locally() and os.path.exists(os.path.join(APP_DIR, "fetch_2026.py")):
     render_update_panel()
@@ -737,7 +999,7 @@ if view == "Team Explorer":
         season_num = int(season_label[:4])
     except ValueError:
         season_num = 0
-    render_team_explorer(data_dir, weeks_selected, season_num)
+    render_team_explorer(data_dir, weeks_selected, season_num, sit)
     st.stop()
 
 # ---------- Main ----------
@@ -750,13 +1012,12 @@ if not player_name:
     st.caption("Pick a player to view results.")
     st.stop()
 
-plays_pr, pp_pr, unit_sizes = build_scoped(
-    data_dir, tuple(weeks_selected),
-    fingerprint=file_fingerprint(os.path.join(data_dir, "play_players.csv")))
+plays_pr, pp_pr, unit_sizes = scoped(data_dir, weeks_selected, sit)
 
 me = pp_pr[pp_pr["playerName"].str.lower() == player_name.lower()]
 if me.empty:
-    st.info("No PASS/RUSH snaps for this player with the current week filter.")
+    st.info("No PASS/RUSH snaps for this player with the current week "
+            "and situation filter.")
     st.stop()
 
 # ---------- Header metrics ----------
@@ -777,8 +1038,12 @@ m3.metric("Team", teams or "—")
 m4.metric("Position(s)", poss or "—",
           help="Positions the NFL listed him at on those snaps.")
 
-tab_cop, tab_start, tab_week, tab_plays = st.tabs(
-    ["Co-Players", "Starter Analysis", "Weekly Trend", "Plays"])
+if situation_active(sit):
+    st.info("⚑ Situation filter is on — every number on this page counts only his "
+            "snaps in that situation.")
+
+tab_cop, tab_start, tab_sit, tab_week, tab_plays = st.tabs(
+    ["Co-Players", "Starter Analysis", "Situations", "Weekly Trend", "Plays"])
 
 my_keys = me[["gameId", "nflPlayId", "teamId"]].drop_duplicates()
 my_snap_total = len(me[["gameId", "nflPlayId"]].drop_duplicates())
@@ -927,6 +1192,51 @@ with tab_start:
         st.dataframe(qb_tab.rename(columns={"which": "", "snaps": "Snaps"}),
                      **WIDE, hide_index=True)
 
+# ---------- Situations ----------
+with tab_sit:
+    if not has_situation(pp_pr):
+        st.info("This season's CSVs have no down & distance yet. Run "
+                "`python backfill_situations.py`, then the preprocess step.")
+    else:
+        st.caption("How his playing time splits by situation. **Unit snaps** = every "
+                   "snap his unit played in that bucket in the games he was active "
+                   "for · **Share %** = how many of those he was on the field for. A "
+                   "share well above his overall number means he's a specialist for "
+                   "that situation; well below means he comes off in it.")
+        split_name = st.radio("Split by", list(SPLITS), horizontal=True,
+                              key="psit_split")
+        col, order = SPLITS[split_name]
+
+        my_units = me[["gameId", "teamId", "side"]].drop_duplicates()
+        unit_plays = pp_pr.merge(my_units, on=["gameId", "teamId", "side"])
+        unit_plays = unit_plays.drop_duplicates(["gameId", "nflPlayId", "teamId", "side"])
+        split = pd.concat(
+            [me.groupby(col)["nflPlayId"].size().rename("His snaps"),
+             unit_plays.groupby(col)["nflPlayId"].size().rename("Unit snaps")],
+            axis=1).fillna(0).astype(int)
+        rows = [b for b in (order or sorted(split.index)) if b in split.index]
+        rows += [b for b in split.index if b not in rows]
+        split = split.loc[rows]
+        split["Share %"] = (100 * split["His snaps"] /
+                            split["Unit snaps"].where(split["Unit snaps"] > 0)).round(1)
+        overall = round(100 * len(me) / max(len(unit_plays), 1), 1)
+        st.caption(f"Overall he played {len(me)} of his unit's {len(unit_plays)} "
+                   f"pass/rush snaps ({overall}%) — the dashed line below.")
+
+        plot = split.reset_index().rename(columns={col: "Bucket"})
+        plot["Bucket"] = plot["Bucket"].astype(str)
+        bars = alt.Chart(plot).mark_bar().encode(
+            x=alt.X("Bucket:N", sort=list(plot["Bucket"]), title=None,
+                    axis=alt.Axis(labelAngle=-30)),
+            y=alt.Y("Share %:Q", title="% of unit snaps he played",
+                    scale=alt.Scale(domain=[0, 100])),
+            tooltip=["Bucket", "His snaps", "Unit snaps", "Share %"])
+        rule = alt.Chart(pd.DataFrame({"y": [overall]})).mark_rule(
+            strokeDash=[5, 5], color="#888").encode(y="y:Q")
+        st.altair_chart((bars + rule).properties(height=300), **WIDE)
+        st.dataframe(split.reset_index().rename(columns={col: split_name}),
+                     **WIDE, hide_index=True)
+
 # ---------- Weekly Trend ----------
 with tab_week:
     wk = (me.groupby(["week", "teamId", "side"], as_index=False)
@@ -983,7 +1293,9 @@ with tab_plays:
 
         plays_involving["Drive"] = plays_involving["driveNum"].astype("Int64")
         show_cols = [c for c in ["gameId", "week", "Drive", "nflPlayId", "nflPlayType",
-                                 "nflPlayDescription", "Teammates on field", "nflPlayUrl"]
+                                 "Down & distance", "Field zone", "Off personnel",
+                                 "Def personnel", "nflPlayDescription",
+                                 "Teammates on field", "nflPlayUrl"]
                      if c in plays_involving.columns]
         st.dataframe(plays_involving[show_cols], **WIDE, height=500,
                      hide_index=True,

@@ -1,7 +1,9 @@
 """Fetch 2026 preseason play-by-play + on-field lineups from pro.nfl.com.
 
 Produces games_2026/game_2026NNN.json files in the same shape as the 2025
-game_2025NNN.json files (metadata + plays[] with offensePlayers/defensePlayers).
+game_2025NNN.json files (metadata + plays[] with offensePlayers/defensePlayers,
+plus the down/distance/field-position fields summaryPlay hands back anyway —
+see situation_fields; backfill_situations.py adds those to older files).
 
 Auth: only the play-list endpoint (/api/secured/plays/playlist/game) needs a
 logged-in NFL Pro session. Everything else (schedule, summaryPlay lineups) is
@@ -267,6 +269,29 @@ def player_dicts(summary):
     return away, home
 
 
+# The same summaryPlay response that carries the lineups also says what
+# situation the play was run in. Keeping it is free (no extra request) and is
+# what lets the app split snaps by down, distance and field position.
+SITUATION_KEYS = ("quarter", "down", "yardsToGo", "gameClock",
+                  "yardlineSide", "yardlineNumber", "isGoalToGo",
+                  "isRedzonePlay", "isSTPlay", "isNoPlay",
+                  "possessionTeamId", "expectedPoints", "expectedPointsAdded")
+
+
+def situation_fields(summary):
+    """Down/distance/field-position/score fields out of a summaryPlay response.
+
+    Scores come back home/visitor; they're stored offense/defense-relative so
+    downstream code doesn't have to know which team was home.
+    """
+    sp = (summary or {}).get("play") or {}
+    out = {k: sp.get(k) for k in SITUATION_KEYS}
+    home, visitor = sp.get("preSnapHomeScore"), sp.get("preSnapVisitorScore")
+    off, dfn = (home, visitor) if summary.get("homeIsOffense") else (visitor, home)
+    out["offScore"], out["defScore"] = off, dfn
+    return out
+
+
 def build_game_json(session, auth, seq_game_id, game, week, week_slug):
     game_uuid = game["gameId"]
     plays_raw = fetch_playlist(session, auth, game_uuid)
@@ -296,6 +321,7 @@ def build_game_json(session, auth, seq_game_id, game, week, week_slug):
             "nflPlayDescription": desc,
             "nflPlayFullDescription": sp.get("playDescriptionWithJerseyNumbers") or desc,
             "nflPlayUrl": f"{BASE}/api/plays/summaryPlay?gameId={game_uuid}&playId={play_id}",
+            **situation_fields(summary),
             "offensePlayers": offense,
             "defensePlayers": defense,
         })

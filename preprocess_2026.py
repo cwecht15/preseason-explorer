@@ -3,11 +3,17 @@
 Reads games_2026/game_2026NNN.json (same shape as the 2025 files) and writes
 the five CSVs the app / 2025 pipeline used into data_2026/:
 
-  plays_unique.csv     gameId, week, nflPlayId, nflPlayType, nflPlayDescription, nflPlayUrl
+  plays_unique.csv     gameId, week, nflPlayId, nflPlayType, nflPlayDescription,
+                       nflPlayUrl + the situation columns (see SITUATION_COLS)
   play_players.csv     ... + side (off/def), playerName, teamId, position
   players_index.csv    playerName, teamId, position, pass_rush_snaps
   coplayer_counts.csv  playerName, teammate, teamId, count
   plays_wide.csv       play row + offensePlayer1..N, defensePlayer1..N
+
+Situation columns (down, distance, field position, personnel) stay on the
+play-level tables only - the app joins them onto play_players by
+gameId+nflPlayId, which keeps the biggest CSV from growing. They're empty for
+games fetched before situation_fields existed; run backfill_situations.py.
 
 Point the app's sidebar "Folder containing the CSVs" at data_2026 to use it.
 
@@ -80,17 +86,116 @@ def true_offense_team(play):
 def corrected_sides(play):
     """Return (offense_list, defense_list, status), swapping the JSON's arrays
     when the described ball-handler sits on the 'defense' side.
-    status: 'ok' | 'swapped' | 'unresolved' (unresolved keeps original labels)."""
+    status: 'ok' | 'swapped' | 'unresolved' (unresolved keeps original labels).
+
+    possessionTeamId settles it outright when it's there (backfilled files and
+    anything fetched since); the description parsing is the fallback for files
+    that predate it.
+    """
     off = play.get("offensePlayers") or []
     de = play.get("defensePlayers") or []
     if not is_pass_rush(play.get("nflPlayType")) or not (off or de):
         return off, de, "ok"
+
+    poss = play.get("possessionTeamId")
+    if poss is not None:
+        poss = str(poss)
+        if any(str(p.get("teamId")) == poss for p in de):
+            return de, off, "swapped"
+        if any(str(p.get("teamId")) == poss for p in off):
+            return off, de, "ok"
+        # possession team on neither side (rare data glitch): fall through
+
     team = true_offense_team(play)
     if team is None:
         return off, de, "unresolved"
     if any(p.get("teamId") == team for p in de):
         return de, off, "swapped"
     return off, de, "ok"
+
+
+# ---------- Situation ----------
+# Raw-ish columns only: what the API said, plus field position normalized to
+# "yards from the end zone the offense is attacking" and personnel counted off
+# the lineups. Buckets (short/long, red zone, nickel, pass-down) are the app's
+# job, so the thresholds stay adjustable there instead of baked into the CSVs.
+SITUATION_COLS = [
+    "quarter", "down", "yardsToGo", "gameClock", "yardsToGoal", "isGoalToGo",
+    "isRedzone", "possessionTeamId", "offScore", "defScore",
+    "expectedPointsAdded", "offN", "offRB", "offTE", "offWR", "offOL",
+    "defN", "defDL", "defLB", "defDB",
+]
+
+
+def team_abbrs(path="teams.csv"):
+    """teamId -> abbr ('3800' -> 'AZ'), matching the yardlineSide vocabulary."""
+    if not os.path.exists(path):
+        print(f"note: no {path}, field position will be blank")
+        return {}
+    t = pd.read_csv(path, dtype=str)
+    return {str(r.teamId): str(r.abbr) for r in t.itertuples()
+            if pd.notna(r.teamId) and pd.notna(r.abbr)}
+
+
+def yards_to_goal(play, abbrs):
+    """Yards from the line of scrimmage to the end zone the offense wants.
+
+    The API gives field position as a side + number ('AZ 37'), which is only
+    meaningful once you know who has the ball; this flattens it to 1-99 so
+    "inside the 20" is one comparison instead of two.
+    """
+    number = play.get("yardlineNumber")
+    if number is None:
+        return None
+    number = int(number)
+    if number == 50:
+        return 50
+    side = play.get("yardlineSide")
+    own = abbrs.get(str(play.get("possessionTeamId")))
+    if not side or not own:
+        return None
+    return 100 - number if side == own else number
+
+
+def personnel(players):
+    """Counts by positionGroup for one side's lineup.
+
+    These are the positions the NFL lists players at, not where they lined up,
+    so a fullback counts as an RB and a tackle-eligible package reads as six
+    linemen. Good enough to tell 11 from 12 personnel and base from nickel.
+    """
+    counts = {}
+    for p in players:
+        group = str(p.get("positionGroup") or "?")
+        counts[group] = counts.get(group, 0) + 1
+    return counts
+
+
+def situation_row(play, off_list, def_list, abbrs):
+    off = personnel(off_list)
+    de = personnel(def_list)
+    # offN/defN so the app can tell a real personnel grouping from a lineup
+    # that came back short - "1 RB 0 TE" out of 10 players would otherwise read
+    # as a formation choice rather than a data gap
+    return {
+        "quarter": play.get("quarter"),
+        "down": play.get("down"),
+        "yardsToGo": play.get("yardsToGo"),
+        "gameClock": play.get("gameClock"),
+        "yardsToGoal": yards_to_goal(play, abbrs),
+        "isGoalToGo": play.get("isGoalToGo"),
+        "isRedzone": play.get("isRedzonePlay"),
+        "possessionTeamId": play.get("possessionTeamId"),
+        "offScore": play.get("offScore"),
+        "defScore": play.get("defScore"),
+        "expectedPointsAdded": play.get("expectedPointsAdded"),
+        "offN": len(off_list),
+        "offRB": off.get("RB", 0), "offTE": off.get("TE", 0),
+        "offWR": off.get("WR", 0), "offOL": off.get("OL", 0),
+        "defN": len(def_list),
+        "defDL": de.get("DL", 0), "defLB": de.get("LB", 0),
+        "defDB": de.get("DB", 0),
+    }
 
 
 def load_games(in_dir):
@@ -111,7 +216,8 @@ def main():
     args = ap.parse_args()
 
     plays_rows, pp_rows, wide_rows = [], [], []
-    swapped = unresolved = 0
+    swapped = unresolved = no_situation = 0
+    abbrs = team_abbrs(os.path.join(os.path.dirname(os.path.abspath(__file__)), "teams.csv"))
 
     for g in load_games(args.in_dir):
         game_id, week = g["gameId"], g.get("week")
@@ -121,6 +227,8 @@ def main():
                 swapped += 1
             elif status == "unresolved":
                 unresolved += 1
+            if pl.get("down") is None:
+                no_situation += 1
             base = {
                 "gameId": game_id,
                 "week": week,
@@ -128,9 +236,10 @@ def main():
                 "nflPlayType": pl.get("nflPlayType", ""),
                 "nflPlayDescription": pl.get("nflPlayDescription", ""),
             }
-            plays_rows.append({**base, "nflPlayUrl": pl.get("nflPlayUrl", "")})
+            sit = situation_row(pl, off_list, def_list, abbrs)
+            plays_rows.append({**base, "nflPlayUrl": pl.get("nflPlayUrl", ""), **sit})
 
-            wide = {**base, "nflPlayUrl": pl.get("nflPlayUrl", "")}
+            wide = {**base, "nflPlayUrl": pl.get("nflPlayUrl", ""), **sit}
             for players, side, prefix in (
                 (off_list, "off", "offensePlayer"),
                 (def_list, "def", "defensePlayer"),
@@ -180,6 +289,9 @@ def main():
 
     if swapped or unresolved:
         print(f"side repair: swapped {swapped} plays, {unresolved} unresolved (kept original labels)")
+    if no_situation:
+        print(f"{no_situation} play(s) with no down/distance - "
+              f"run backfill_situations.py to fill them in")
     print(f"{args.out_dir}/")
     print(f"  plays_unique.csv     {len(plays):>7} rows")
     print(f"  play_players.csv     {len(pp):>7} rows")
