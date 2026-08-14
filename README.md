@@ -36,10 +36,13 @@ so nothing you fetch there would survive or be visible anyway.
 2. **Fetch + preprocess.** Runs `fetch_2026.py` then `preprocess_2026.py`.
    Games already in `games_2026/` are skipped, so re-running is cheap.
    Disabled while the token is bad.
-3. **Commit + push.** Commits the changed data files and pushes to
-   `origin/main`, which is what makes the hosted app redeploy. Until you do
-   this the hosted app still shows the old numbers. If the push is rejected
-   because the remote moved on, `git pull --rebase` here and publish again.
+3. **Commit + push.** Commits the changed data files and pushes to the
+   upstream branch, which is what makes the hosted app redeploy. The step
+   names the remote and repo it's about to push to — this repo has a second
+   remote (`app` → the legacy `cwecht15/preseason-app`, no longer deployed),
+   and a push landing there looks exactly like a redeploy that did nothing.
+   Until you publish, the hosted app still shows the old numbers. If the push
+   is rejected because the remote moved on, `git pull --rebase` and republish.
 
 The panel is hidden when the app runs on Streamlit Cloud (see
 `running_locally()`), since that deployment is public — a token box on it would
@@ -73,6 +76,8 @@ Raw 2025 game JSONs (57 MB) are not committed; refetch with the pipeline.
 streamlit run preseason_app.py
 ```
 
-Deployed via Streamlit Community Cloud from this repo (main branch,
-`preseason_app.py`) — every push redeploys automatically. The update panel
-(auth / fetch / publish) is local-only; see "Updating the data" above.
+Deployed via Streamlit Community Cloud from `cwecht15/preseason-explorer`
+(branch `main`, `preseason_app.py`) — every push redeploys automatically. The
+older `cwecht15/preseason-app` repo is legacy; its history was absorbed here
+and it is no longer the deploy source. The update panel (auth / fetch /
+publish) is local-only; see "Updating the data" above.

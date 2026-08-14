@@ -180,6 +180,22 @@ def git(*args):
     return r.returncode == 0, (r.stdout + r.stderr).strip()
 
 
+def push_target():
+    """(remote, branch, owner/repo) a publish would push to, or None.
+
+    Named in the UI on purpose: this repo has more than one remote, and a
+    push landing somewhere the hosted app doesn't read looks exactly like a
+    deploy that silently did nothing.
+    """
+    ok, ref = git("rev-parse", "--abbrev-ref", "@{upstream}")
+    if not ok or "/" not in ref:
+        return None
+    remote, branch = ref.split("/", 1)
+    ok, url = git("remote", "get-url", remote)
+    slug = "/".join(url.rstrip("/").removesuffix(".git").replace("\\", "/").split("/")[-2:]) if ok else "?"
+    return remote, branch, slug
+
+
 def publish_status():
     """Is any pipeline output still sitting on this machine only?"""
     # -uall lists new game files one by one instead of collapsing them into
@@ -214,7 +230,8 @@ def publish_data(files):
         ok, out = git("commit", "-m", f"data: update 2026 preseason ({len(files)} file(s))")
         if not ok:
             return False, f"git commit failed:\n{out}"
-    ok, out = git("push")
+    target = push_target()
+    ok, out = git("push", target[0], f"HEAD:{target[1]}") if target else git("push")
     if not ok:
         low = out.lower()
         if "rejected" in low or "non-fast-forward" in low:
@@ -224,7 +241,9 @@ def publish_data(files):
             out += ("\n\nGit couldn't authenticate to GitHub. Push once from a "
                     "terminal to refresh your saved credentials, then try again.")
         return False, f"git push failed:\n{out}"
-    return True, "Pushed to origin/main. Streamlit Cloud redeploys on its own, usually within a minute or two."
+    where = f"{target[0]}/{target[1]} ({target[2]})" if target else "the default remote"
+    return True, (f"Pushed to {where}. Streamlit Cloud redeploys on its own, "
+                  "usually within a minute or two.")
 
 
 def render_update_panel():
@@ -307,8 +326,12 @@ def render_update_panel():
         st.divider()
         # recomputed: a fetch in this same run may have just changed the answer
         pub = publish_status()
+        target = push_target()
         st.markdown(f"**3 · Publish to the hosted app** — {pub['short']}")
-        st.caption(pub["message"])
+        st.caption(pub["message"] + (
+            f" Goes to **{target[0]}/{target[1]}** ({target[2]}) — the repo Streamlit "
+            "Cloud deploys from." if target else
+            " No upstream branch is set, so a push has nowhere to go."))
         if pub["files"]:
             st.code("\n".join(pub["files"][:8]) +
                     (f"\n… and {len(pub['files']) - 8} more" if len(pub["files"]) > 8 else ""))
