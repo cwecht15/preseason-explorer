@@ -97,7 +97,9 @@ def load_games(in_dir):
     paths = sorted(glob.glob(os.path.join(in_dir, "game_*.json")))
     if not paths:
         raise SystemExit(f"No game_*.json files in {in_dir}")
-    for p in paths:
+    print(f"{len(paths)} game file(s) to process")
+    for i, p in enumerate(paths, start=1):
+        print(f"  reading {os.path.basename(p)} ({i}/{len(paths)})", flush=True)
         with open(p, encoding="utf-8") as f:
             yield json.load(f)
 

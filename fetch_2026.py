@@ -357,8 +357,14 @@ def main():
     # keep earlier ids stable (new games always sort later).
     todo.sort(key=lambda t: (t[0], t[2].get("startTime", "")))
 
-    for n, (week, slug, game) in enumerate(todo, start=1):
-        seq_game_id = SEASON * 1000 + n
+    plan = [(SEASON * 1000 + n, week, slug, game)
+            for n, (week, slug, game) in enumerate(todo, start=1)]
+    todo_now = [p for p in plan
+                if not os.path.exists(os.path.join(OUT_DIR, f"game_{p[0]}.json"))]
+    # counted up front so a caller can turn this into a progress bar
+    print(f"{len(todo_now)} game(s) to fetch, {len(plan) - len(todo_now)} already on disk")
+
+    for seq_game_id, week, slug, game in plan:
         out_path = os.path.join(OUT_DIR, f"game_{seq_game_id}.json")
         if os.path.exists(out_path):
             print(f"game_{seq_game_id}.json exists, skipping")

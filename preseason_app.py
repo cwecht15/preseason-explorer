@@ -1,7 +1,9 @@
 import glob
 import os
+import re
 import subprocess
 import sys
+import time
 
 import altair as alt
 import pandas as pd
@@ -164,11 +166,59 @@ def running_locally():
     return not here.startswith(("/mount/src", "/app"))
 
 
-def run_script(script, tail=1500):
-    r = subprocess.run([sys.executable, script], cwd=APP_DIR,
-                       capture_output=True, text=True)
-    st.code((r.stdout + r.stderr)[-tail:] or "(no output)")
-    return r.returncode == 0
+def elapsed_since(t0):
+    s = int(time.time() - t0)
+    return f"{s // 60}m {s % 60:02d}s"
+
+
+def run_script(script, progress=False, keep=10):
+    """Run a pipeline script, showing its output as it arrives.
+
+    capture_output=True held every line until the process exited, which made a
+    ten-minute fetch look like a hung spinner. -u stops the child buffering.
+    """
+    t0 = time.time()
+    lines, log = [], st.empty()
+    bar = st.progress(0.0, text="starting…") if progress else None
+    total = current = 0
+    within = 0.0
+    detail = "starting…"
+
+    proc = subprocess.Popen([sys.executable, "-u", script], cwd=APP_DIR,
+                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                            text=True, bufsize=1)
+    for raw in proc.stdout:
+        line = raw.rstrip()
+        if not line:
+            continue
+        lines.append(line)
+        log.code("\n".join(lines[-keep:]))
+        if not bar:
+            continue
+        # fetch_2026.py's own prints, read back as progress
+        m = re.search(r"(\d+) game\(s\) to fetch", line)
+        if m:
+            total = int(m.group(1))
+        if line.startswith("Fetching game"):
+            current, within, detail = current + 1, 0.0, "reading play list"
+        m = re.search(r"(\d+)/(\d+) plays", line)
+        if m:
+            within = int(m.group(1)) / max(int(m.group(2)), 1)
+            detail = f"{m.group(1)}/{m.group(2)} plays"
+        if line.lstrip().startswith("wrote "):
+            within, detail = 1.0, "saved"
+        if total:
+            head = (f"game {current} of {total} · {detail}" if current
+                    else f"{total} game(s) to fetch")
+            bar.progress(min((max(current - 1, 0) + within) / total, 1.0),
+                         text=f"{head} · {elapsed_since(t0)}")
+    proc.wait()
+
+    if not lines:
+        log.code("(no output)")
+    if bar:
+        bar.progress(1.0, text=f"done in {elapsed_since(t0)}")
+    return proc.returncode == 0
 
 
 def git(*args):
@@ -332,9 +382,9 @@ def render_update_panel():
                      help="Refresh the token first (step 1)" if stale else
                           "Runs fetch_2026.py, then preprocess_2026.py"):
             with st.status("Fetching from pro.nfl.com…", expanded=True) as box:
-                if not run_script("fetch_2026.py"):
+                if not run_script("fetch_2026.py", progress=True):
                     box.update(label="Fetch failed — see output above", state="error")
-                elif not run_script("preprocess_2026.py", tail=800):
+                elif not run_script("preprocess_2026.py"):
                     box.update(label="Preprocess failed — see output above", state="error")
                 else:
                     box.update(label="Data updated — now publish it (step 3)", state="complete")
@@ -375,13 +425,7 @@ COACH_ABBR_FIX = {"BLT": "BAL", "CLV": "CLE", "HST": "HOU", "ARZ": "AZ", "LA": "
 
 
 def rebuild_trends():
-    for script in ("starter_trends.py", "starter_summary.py"):
-        r = subprocess.run([sys.executable, script], cwd=APP_DIR,
-                           capture_output=True, text=True)
-        st.code((r.stdout + r.stderr)[-800:] or "(no output)")
-        if r.returncode != 0:
-            return False
-    return True
+    return all(run_script(s) for s in ("starter_trends.py", "starter_summary.py"))
 
 
 def render_starter_trends():
