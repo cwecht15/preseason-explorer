@@ -29,15 +29,30 @@ defense.
 
 | Column | |
 |---|---|
-| Snaps | his pass/rush snaps in the selected weeks |
+| Snaps | his scrimmage snaps (pass, rush, sack) in the selected weeks |
+| % of room | share of the snaps his team played at his position — 47 means nothing until you know the room ran 60 or 200 |
+| Δ share | change in that share, latest week vs the one before. The preseason signal is movement, not the total; **Climbing / Slipping** lines above the table name the biggest movers |
+| Car · Tgt · Rec | carries, targets and catches, from the NFL's own per-play stat lines |
 | QB1 | who that starter actually was, across the games he played — "Beck / Brissett" when it changed week to week |
 | w/ QB1 | of the snaps that game's **starting** QB was on the field for, how many he was out there for. On defense the pair is `QB1 faced` / `vs QB1` — the starter he lined up against |
 | RZ · GL | inside the 20 (goal line included) · inside the 5 or goal-to-go |
-| ShortYd · PassDn | 2 or fewer to go · 3rd/4th & 5+ or 2nd & 8+ (both follow the sidebar sliders) |
+| ShortYd · Dropback | 2 or fewer to go · snaps the offense actually dropped back on |
 | 3rdDn · Q4 | third down · fourth quarter, where late duty marks depth |
-| Drives · Drives played | how many of his team's drives he was out there for, and which ones — `Wk 1 D2,D4,D6`. Drive numbers count both teams' possessions in game order, so low numbers are the first group |
+| 11 · 12 · 21 · 13 | personnel groupings, RB count then TE count. On defense, what he faced |
+| Drives · Drives played | how many of his unit's drives he was out there for, and which — `Wk 1 D1,D2,D3`, numbered as **that team's own possessions**, so D1 is its opening series whether or not it had the ball first |
 
-**Click any row** to open that player's Player Explorer page.
+**Click any row** to open that player's Player Explorer page. Every column sorts
+from its own header. The **Show** toggle swaps every situation column between
+`played/chances`, plain counts, share, and touches (carries + targets in that
+situation). **⭐ Watchlist** stars the players you keep checking; it saves to
+`watchlist.json` and survives a restart.
+
+**Dropback is what the offense did, not what the down chart predicted.** It
+counts pass attempts, sacks and scrambles — a 3rd & 8 handoff is not a passing
+snap by any useful reading, and a sack is a dropback that ended badly. (The
+sidebar's "Down type" filter and the Situations tabs still use the
+down-and-distance convention; they answer a different question — what the
+situation *called for*.)
 
 Cells are `played/chances`, the same drive window the Situations tabs use, so
 the two reconcile exactly. **The starter is whoever took the unit's first snap
@@ -48,11 +63,9 @@ dressed for, so a week-3 call-up isn't marked down for the starter snaps of
 weeks he wasn't there. That's why two Cardinals backs can read `7/10` and
 `10/49` — different quarterbacks, different games.
 
-Two notes. The board's `RZ` includes goal-line snaps, while the Situations tab's
-`Red zone (6-20)` bucket excludes them (those zones are mutually exclusive) — so
-the same player can show a larger RZ number here, by design. And because a
-`7/9` cell is text, clicking a column header sorts it alphabetically; use the
-**Sort by** control, or switch **Show** to Counts, which sorts properly.
+One difference worth knowing: the board's `RZ` includes goal-line snaps, while
+the Situations tab's `Red zone (6-20)` bucket excludes them (those zones are
+mutually exclusive), so the same player can show a larger RZ number here.
 
 ### Situations
 
@@ -191,6 +204,17 @@ possession — `preprocess_2026.py` repairs sides, preferring the API's
 `possessionTeamId` and falling back to parsing the play description for files
 that predate it. Raw 2025 game JSONs (57 MB) are not committed; refetch with
 the pipeline, then run `backfill_situations.py` to get down & distance on them.
+
+Snap counts cover **scrimmage plays: pass, rush and sack**. Sacks are their own
+play type in the source and were once excluded, which undercounted everyone by
+about 4% and dropped the snaps a quarterback most needs charting on.
+
+`summaryPlay` also returns `playStats` — the NFL's own per-play stat lines,
+keyed by the same `gsisId` the lineup rows carry — which is where carries,
+targets and catches come from. No name matching, no parsing the description.
+The stat ids are decoded in `preprocess_2026.py` (10 rush, 115 target, 21/22
+reception); those meanings were confirmed against the play descriptions in this
+data rather than taken on faith.
 
 `summaryPlay` returns the situation (down, distance, field position, score,
 EPA) in the same response as the lineups, so `fetch_2026.py` keeps both and new

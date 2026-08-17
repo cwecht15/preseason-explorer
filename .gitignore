@@ -1,5 +1,6 @@
 auth.txt
 game_2025*.json
+watchlist.json
 __pycache__/
 *.pyc
 .streamlit/secrets.toml

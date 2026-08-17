@@ -1,4 +1,5 @@
 import glob
+import json
 import os
 import re
 import subprocess
@@ -77,8 +78,11 @@ def team_label(tid):
 
 # ---------- Core frames ----------
 def pr_filter(df):
+    # SACK is its own play type but it is a snap the same eleven played, and
+    # leaving it out undercounted everyone by ~4% while hiding the down a
+    # quarterback most needs charting on
     typ = df["nflPlayType"].fillna("").astype(str)
-    return df[(typ == "RUSH") | (typ.str.startswith("PASS"))]
+    return df[(typ == "RUSH") | (typ == "SACK") | (typ.str.startswith("PASS"))]
 
 def scope_weeks(df, weeks_selected):
     if not weeks_selected:
@@ -87,7 +91,7 @@ def scope_weeks(df, weeks_selected):
 
 @st.cache_data(show_spinner=False)
 def build_scoped(data_dir, weeks_key, fingerprint=None):
-    """PASS/RUSH-only plays and player-rows for the selected weeks,
+    """Scrimmage plays (pass, rush, sack) and player-rows for the selected weeks,
     plus each unit's snap-order index within its game."""
     plays, pp = load_all(data_dir)
     weeks = list(weeks_key)
@@ -104,7 +108,7 @@ def build_scoped(data_dir, weeks_key, fingerprint=None):
     plays_pr = add_situation_labels(plays_pr, DEFAULT_SIT)
     pp_pr = add_situation_labels(pp_pr, DEFAULT_SIT)
 
-    # snap index: order of a unit's (team+side) PASS/RUSH snaps within a game
+    # snap index: order of a unit's (team+side) scrimmage snaps within a game
     unit = (pp_pr[["gameId", "teamId", "side", "nflPlayId"]]
             .drop_duplicates()
             .sort_values(["gameId", "teamId", "side", "nflPlayId"]))
@@ -124,7 +128,7 @@ def build_scoped(data_dir, weeks_key, fingerprint=None):
         drive, snap_in, boundary, prev_team = 0, 0, True, None
         for r in g.itertuples():
             t = str(r.nflPlayType)
-            if t == "RUSH" or t.startswith("PASS"):
+            if t in ("RUSH", "SACK") or t.startswith("PASS"):
                 team = off_team.get((gid, r.nflPlayId))
                 if team is None:
                     continue
@@ -142,8 +146,15 @@ def build_scoped(data_dir, weeks_key, fingerprint=None):
     if not drives.empty:
         pp_pr = pp_pr.merge(drives, on=["gameId", "nflPlayId"], how="left")
         plays_pr = plays_pr.merge(drives, on=["gameId", "nflPlayId"], how="left")
+        # ...and again as each unit's own possessions: driveNum counts both
+        # teams, so a team's opening drive can be D2 of the game, which reads
+        # like second-string work when it is exactly the opposite
+        own = (pp_pr[["gameId", "teamId", "side", "driveNum"]].dropna()
+               .drop_duplicates().sort_values(["gameId", "teamId", "side", "driveNum"]))
+        own["teamDrive"] = own.groupby(["gameId", "teamId", "side"]).cumcount() + 1
+        pp_pr = pp_pr.merge(own, on=["gameId", "teamId", "side", "driveNum"], how="left")
     else:
-        pp_pr["driveNum"] = pp_pr["driveSnap"] = None
+        pp_pr["driveNum"] = pp_pr["driveSnap"] = pp_pr["teamDrive"] = None
         plays_pr["driveNum"] = plays_pr["driveSnap"] = None
     return plays_pr, pp_pr, unit_sizes
 
@@ -164,7 +175,10 @@ def game_labels(pp_pr):
 # personnel counts); the buckets live here so the thresholds stay adjustable
 # in the sidebar instead of being frozen into the data.
 SITUATION_COLS = ["down", "yardsToGo", "yardsToGoal", "isGoalToGo", "isRedzone",
-                  "quarter", "offN", "offRB", "offTE", "offOL", "defN", "defDB"]
+                  "quarter", "offN", "offRB", "offTE", "offOL", "defN", "defDB",
+                  # who the ball went to on the play, so a player row can tell
+                  # whether he was merely out there or actually got it
+                  "rusher", "target", "receiver"]
 ORDINALS = {1: "1st", 2: "2nd", 3: "3rd", 4: "4th"}
 # 8-10 and 11+ are split so a 1st & 10 doesn't sit in the same bucket as a
 # 3rd & 15 - on the downs where it matters, that's the whole distinction
@@ -185,28 +199,54 @@ DEFAULT_SIT = {"pass_late": 5, "pass_second": 8, "short": 2,
 # RZ deliberately includes the goal line, unlike the mutually-exclusive "Red
 # zone (6-20)" bucket in the Situations tabs — "red-zone snaps" in normal speech
 # means everything inside the 20. The board says so on screen.
+def _personnel(d, rb, te):
+    return (num(d, "offN") == 11) & (num(d, "offRB") == rb) & (num(d, "offTE") == te)
+
+
 BOARD_MASKS = {
     "RZ": lambda d, s: (num(d, "yardsToGoal") <= 20) | _bools(d, "isRedzone"),
     "GL": lambda d, s: (num(d, "yardsToGoal") <= 5) | _bools(d, "isGoalToGo"),
     "ShortYd": lambda d, s: num(d, "yardsToGo") <= s["short"],
-    "PassDn": lambda d, s: (((num(d, "down") >= 3) & (num(d, "yardsToGo") >= s["pass_late"]))
-                            | ((num(d, "down") == 2) & (num(d, "yardsToGo") >= s["pass_second"]))),
+    # what the offense actually did, not what the down chart suggested it would:
+    # pass attempts, sacks and scrambles are all snaps the quarterback dropped
+    # back on, and a 3rd & 8 handoff is not a passing snap by any useful reading
+    "Dropback": lambda d, s: _bools(d, "isDropback"),
     "3rdDn": lambda d, s: num(d, "down") == 3,
     "Q4": lambda d, s: num(d, "quarter") == 4,
+    "11": lambda d, s: _personnel(d, 1, 1),
+    "12": lambda d, s: _personnel(d, 1, 2),
+    "21": lambda d, s: _personnel(d, 2, 1),
+    "13": lambda d, s: _personnel(d, 1, 3),
 }
 BOARD_HELP = {
-    "Snaps": "His pass/rush snaps in the selected weeks.",
+    "Snaps": "His scrimmage snaps (pass, rush, sack) in the selected weeks.",
+    "% of room": "Share of the snaps his team played at his position.",
+    "Δ share": "Change in his share of team snaps, latest week vs the one before "
+               "— the preseason signal is movement, not the total.",
+    "Car · Tgt · Rec": "Carries, targets and catches, from the NFL's own stat "
+                       "lines. Snaps are opportunity; these are a role.",
     "RZ": "Inside the 20 — goal-line snaps included.",
     "GL": "Inside the 5, or goal-to-go.",
     "ShortYd": "2 or fewer to go (the sidebar slider sets it).",
-    "PassDn": "3rd/4th & 5+, or 2nd & 8+ (sidebar sliders).",
+    "Dropback": "Snaps the offense actually dropped back on — pass attempts, "
+                "sacks and scrambles. Not a down-and-distance guess.",
     "3rdDn": "Third down.",
     "Q4": "Fourth quarter — late duty is a depth signal.",
+    "11 · 12 · 21 · 13": "Personnel groupings, RB then TE count: 11 is 1 RB 1 TE "
+                         "3 WR, 12 is two tight ends, 21 adds a fullback, 13 is "
+                         "three tight ends. Roster-listed positions, not "
+                         "alignment. On defense these are what he faced.",
 }
 SKILL_POSITIONS = ["QB", "RB", "FB", "WR", "TE"]
 DEF_POSITIONS = ["CB", "S", "FS", "SS", "DB", "OLB", "ILB", "MLB", "LB"]
 BOARD_MODES = {"Played / chances": "chances", "Counts": "counts",
-               "Share of chances %": "share"}
+               "Share of chances %": "share", "Touches (car + tgt)": "touches"}
+# what "his position room" means, for the share-of-room column
+POSITION_ROOM = {"RB": "RB", "FB": "RB", "WR": "WR", "TE": "TE", "QB": "QB",
+                 "T": "OL", "G": "OL", "C": "OL",
+                 "CB": "DB", "S": "DB", "FS": "DB", "SS": "DB", "DB": "DB",
+                 "OLB": "LB", "ILB": "LB", "MLB": "LB", "LB": "LB",
+                 "DE": "DL", "DT": "DL", "NT": "DL"}
 
 SPLITS = {"Down & distance": ("Down & distance", DOWN_DIST),
           "Pass vs run down": ("Situation", CALLS),
@@ -460,15 +500,15 @@ def qb1_label(names):
 
 
 def drive_label(rows, cap=8):
-    """"HOF D1,D3 · Wk 1 D5" — the team drives he was on the field for.
+    """"HOF D1,D2 · Wk 1 D3" — which of his unit's own drives he played.
 
-    Drive numbers count both teams' possessions in game order, the same
-    numbering the Team Explorer's drive matrix uses, so D1 is the game's
-    opening drive and low numbers mean he was out there with the first group.
+    Numbered per team, not per game: the game's drive numbering alternates
+    between the two sidelines, so a team's opening possession can be D2, which
+    reads like second-string work when it is the exact opposite.
     """
     parts, shown = [], 0
-    for week, grp in rows.sort_values(["week", "driveNum"]).groupby("week"):
-        nums = [int(d) for d in grp["driveNum"]]
+    for week, grp in rows.sort_values(["week", "teamDrive"]).groupby("week"):
+        nums = [int(d) for d in grp["teamDrive"]]
         room = max(cap - shown, 0)
         if not room:
             break
@@ -479,6 +519,18 @@ def drive_label(rows, cap=8):
     return " · ".join(parts) + (f" +{total - shown}" if total > shown else "")
 
 
+def dropback_flag(df):
+    """Did the offense drop back on this snap? Pass, sack or scramble.
+
+    Sacks and scrambles are pass plays that never became throws; counting them
+    as runs would credit a quarterback's escape to the ground game and leave a
+    lineman's worst snaps out of his pass-protection total.
+    """
+    typ = df["nflPlayType"].fillna("").astype(str)
+    desc = df.get("nflPlayDescription", pd.Series("", index=df.index)).fillna("")
+    return typ.str.startswith("PASS") | typ.eq("SACK") | desc.str.contains("scramble")
+
+
 def league_chances(pp):
     """One row per (player, snap that was his to play), for every team at once.
 
@@ -486,9 +538,9 @@ def league_chances(pp):
     at least one snap on — but as a single merge rather than a loop per team,
     because the board needs all 32 at once.
     """
-    unit = pp[["gameId", "teamId", "side", "nflPlayId", "driveNum"]
-              + [c for c in SITUATION_COLS if c in pp.columns]].drop_duplicates(
-                  ["gameId", "teamId", "side", "nflPlayId"])
+    carry = [c for c in list(SITUATION_COLS) + ["isDropback"] if c in pp.columns]
+    unit = pp[["gameId", "teamId", "side", "nflPlayId", "driveNum"] + carry
+              ].drop_duplicates(["gameId", "teamId", "side", "nflPlayId"])
     mine = (pp[["playerName", "gameId", "teamId", "side", "driveNum"]]
             .dropna(subset=["driveNum"]).drop_duplicates())
     return mine.merge(unit.dropna(subset=["driveNum"]),
@@ -510,9 +562,10 @@ def board_frame(data_dir, weeks_key, pass_late, pass_second, short, side,
     qb1_keys = qb1[["gameId", "nflPlayId"]].drop_duplicates()
     starters = qb1[["gameId", "qbTeamId", "QB1"]].drop_duplicates()
 
-    pp = pp_all[pp_all["side"] == side]
+    pp = pp_all[pp_all["side"] == side].copy()
     if pp.empty:
         return pd.DataFrame()
+    pp["isDropback"] = dropback_flag(pp)
     if first_team_only:  # narrows both halves of every ratio
         pp = pp.merge(qb1_keys, on=["gameId", "nflPlayId"])
         if pp.empty:
@@ -520,10 +573,44 @@ def board_frame(data_dir, weeks_key, pass_late, pass_second, short, side,
 
     chances = league_chances(pp)
     key = ["playerName", "teamId"]
+    # the ball came to him on this snap — carries and targets are opportunity,
+    # which is what separates a role from a jersey standing in formation
+    for col, flag in (("rusher", "isCarry"), ("target", "isTarget"),
+                      ("receiver", "isRec")):
+        pp[flag] = (pp[col] == pp["playerName"]) if col in pp.columns else False
+    pp["isTouch"] = pp["isCarry"] | pp["isTarget"]
+
     board = (pp.groupby(key)
              .agg(Pos=("position", lambda s: s.mode().iat[0] if not s.mode().empty else "?"),
-                  Snaps=("nflPlayId", "size"))
+                  Snaps=("nflPlayId", "size"),
+                  Car=("isCarry", "sum"), Tgt=("isTarget", "sum"),
+                  Rec=("isRec", "sum"))
              .reset_index())
+
+    # his share of the snaps his team played at his position — 47 snaps means
+    # nothing until you know whether the room ran 60 or 200
+    room = pp.assign(room=pp["position"].map(POSITION_ROOM).fillna(pp["position"]))
+    room_total = (room.groupby(["teamId", "room"])["nflPlayId"].size()
+                  .rename("roomSnaps").reset_index())
+    his_room = room.groupby(key)["room"].agg(
+        lambda s: s.mode().iat[0] if not s.mode().empty else "?").rename("room").reset_index()
+    board = (board.merge(his_room, on=key, how="left")
+             .merge(room_total, on=["teamId", "room"], how="left"))
+
+    # week over week: the preseason signal is movement, not the total
+    weeks = sorted(pp["week"].dropna().unique())
+    if len(weeks) >= 2:
+        last, prev = weeks[-1], weeks[-2]
+        per_week = pp.groupby(key + ["week"])["nflPlayId"].size().rename("n").reset_index()
+        team_week = (pp.drop_duplicates(["gameId", "nflPlayId", "teamId"])
+                     .groupby(["teamId", "week"]).size().rename("teamN").reset_index())
+        per_week = per_week.merge(team_week, on=["teamId", "week"], how="left")
+        per_week["share"] = 100 * per_week["n"] / per_week["teamN"].where(per_week["teamN"] > 0)
+        wide = per_week.pivot_table(index=key, columns="week", values="share")
+        delta = (wide.get(last, 0) - wide.get(prev, 0)).rename("dShare").reset_index()
+        board = board.merge(delta, on=key, how="left")
+    else:
+        board["dShare"] = float("nan")
 
     # w/ QB1: of the snaps the starter was on the field for, how many was he?
     with_q1 = pp.merge(qb1_keys, on=["gameId", "nflPlayId"])
@@ -550,20 +637,26 @@ def board_frame(data_dir, weeks_key, pass_late, pass_second, short, side,
 
     # which of his team's drives he was actually out there for: the aggregate
     # counts say how much, this says when — early drives are the starters'
-    drives = pp[["playerName", "teamId", "week", "driveNum"]].dropna().drop_duplicates()
+    drives = pp[["playerName", "teamId", "week", "teamDrive"]].dropna().drop_duplicates()
     board = board.merge(drives.groupby(key).size().rename("Drives"), on=key, how="left")
     # columns picked before apply, not include_groups= — that kwarg only exists
     # on pandas 2.2+, and this way needs no floor at all
-    board = board.merge(drives.groupby(key)[["week", "driveNum"]].apply(drive_label)
+    board = board.merge(drives.groupby(key)[["week", "teamDrive"]].apply(drive_label)
                         .rename("driveList"), on=key, how="left")
 
     for name, mask in BOARD_MASKS.items():
-        played = pp[mask(pp, sit)].groupby(key).size().rename(f"{name}Played")
+        in_it = pp[mask(pp, sit)]
+        played = in_it.groupby(key).size().rename(f"{name}Played")
         had = chances[mask(chances, sit)].groupby(key).size().rename(f"{name}Chances")
-        board = board.merge(played, on=key, how="left").merge(had, on=key, how="left")
+        touched = in_it.groupby(key)["isTouch"].sum().rename(f"{name}Touch")
+        board = (board.merge(played, on=key, how="left")
+                 .merge(had, on=key, how="left").merge(touched, on=key, how="left"))
 
-    counts = [c for c in board.columns if c.endswith(("Played", "Chances", "Team"))]
+    counts = [c for c in board.columns
+              if c.endswith(("Played", "Chances", "Team", "Touch"))]
     board[counts] = board[counts].fillna(0).astype(int)
+    board["PosShare"] = (100 * board["Snaps"] /
+                         board["roomSnaps"].where(board["roomSnaps"] > 0)).round(1)
     board["Team"] = board["teamId"].map(team_label)
     return board
 
@@ -572,21 +665,89 @@ def board_display(board, mode, side="off"):
     """The frame as shown: ratios, plain counts, or share of chances."""
     out = pd.DataFrame({"Player": board["playerName"], "Team": board["Team"],
                         "Pos": board["Pos"], "Snaps": board["Snaps"]})
+    out["% of room"] = board["PosShare"]
+    out["Δ share"] = board["dShare"].round(1)
+    if side == "off":  # nobody carries the ball on defense
+        # catches are left out on purpose: targets are the usage signal, and
+        # whether the pass arrived is on the quarterback as much as the receiver
+        out["Car"], out["Tgt"] = board["Car"], board["Tgt"]
     # on defense the starter in question is the one across the line
     out["QB1" if side == "off" else "QB1 faced"] = board["QB1name"].fillna("—")
-    pairs = [("w/ QB1" if side == "off" else "vs QB1", "q1Played", "q1Team")] + \
-            [(n, f"{n}Played", f"{n}Chances") for n in BOARD_MASKS]
-    for label, played, total in pairs:
-        if mode == "counts":
+    pairs = [("w/ QB1" if side == "off" else "vs QB1", "q1Played", "q1Team", None)] + \
+            [(n, f"{n}Played", f"{n}Chances", f"{n}Touch") for n in BOARD_MASKS]
+    for label, played, total, touch in pairs:
+        if mode == "touches" and touch:
+            out[label] = board[touch]
+        elif mode == "counts" or (mode == "touches" and not touch):
             out[label] = board[played]
         elif mode == "share":
             out[label] = (100 * board[played] /
                           board[total].where(board[total] > 0)).round(1)
         else:
-            out[label] = board[played].astype(str) + "/" + board[total].astype(str)
+            # right-justified so the browser's own column sort, which compares
+            # these as text, still puts 9/9 below 10/12 where it belongs
+            width = board[played].astype(str).str.len().max()
+            out[label] = (board[played].astype(str).str.rjust(int(width or 1))
+                          + "/" + board[total].astype(str))
     out["Drives"] = board["Drives"].fillna(0).astype(int)
     out["Drives played"] = board["driveList"].fillna("—")
     return out
+
+
+WATCHLIST_PATH = os.path.join(APP_DIR, "watchlist.json")
+
+
+def load_watchlist():
+    """Starred players, kept on disk so they survive a restart."""
+    try:
+        with open(WATCHLIST_PATH, encoding="utf-8") as f:
+            names = json.load(f)
+        return [n for n in names if isinstance(n, str)]
+    except (OSError, ValueError):
+        return []
+
+
+def save_watchlist(names):
+    try:
+        with open(WATCHLIST_PATH, "w", encoding="utf-8") as f:
+            json.dump(sorted(set(names)), f, indent=1)
+    except OSError as e:  # read-only filesystem on the hosted app
+        st.caption(f"(Watchlist not saved: {e.strerror})")
+
+
+def render_movers(board, weeks_selected):
+    """Who moved since last week — the question a second week makes askable."""
+    if board["dShare"].notna().sum() < 2 or len(weeks_selected) < 2:
+        return
+    ranked = board.dropna(subset=["dShare"]).sort_values("dShare", ascending=False)
+    up = ranked[ranked["dShare"] > 0].head(5)
+    down = ranked[ranked["dShare"] < 0].tail(5).iloc[::-1]
+    line = lambda r: f"{r.playerName} ({r.Team} {r.Pos}) {r.dShare:+.0f}pts"
+    c1, c2 = st.columns(2)
+    c1.caption("**Climbing** — " + (" · ".join(line(r) for r in up.itertuples())
+                                    or "nobody gained ground"))
+    c2.caption("**Slipping** — " + (" · ".join(line(r) for r in down.itertuples())
+                                    or "nobody lost ground"))
+
+
+def board_styler(table, mode):
+    """Colour the numeric columns so 600 rows can be scanned, not read."""
+    numeric = [c for c in ("% of room", "Δ share") if c in table.columns]
+    if mode in ("share", "counts", "touches"):
+        numeric += [c for c in BOARD_MASKS if c in table.columns]
+    numeric = [c for c in numeric if pd.api.types.is_numeric_dtype(table[c])]
+    styler = table.style
+    for col in numeric:
+        # Δ is signed, so it gets a diverging scale centred on "no change"
+        if col == "Δ share":
+            limit = max(abs(table[col].min() or 0), abs(table[col].max() or 0), 1)
+            styler = styler.background_gradient("RdYlGn", subset=[col],
+                                                vmin=-limit, vmax=limit)
+        else:
+            styler = styler.background_gradient("Blues", subset=[col])
+    # em dash, not "None": a player with one week of snaps has no delta to show,
+    # which is an absence of comparison rather than a value of nothing
+    return styler.format(precision=1, na_rep="—")
 
 
 def render_board(data_dir, weeks_selected, season, sit):
@@ -594,7 +755,9 @@ def render_board(data_dir, weeks_selected, season, sit):
     st.caption("Every skill player in the league, and what he was on the field for. "
                "**played / chances** — a chance is a snap on a drive he took part in, "
                "so **2/9** means he was in the game for nine of them and out there "
-               "for two, while **0/0** means it never came up while he was in.")
+               "for two, while **0/0** means it never came up while he was in. "
+               "Sort from any column header; the Show toggle swaps every situation "
+               "column between snaps, share and touches.")
     sit = sit or DEFAULT_SIT
     if situation_active(sit):
         st.caption("This view ignores the sidebar situation filter — the columns "
@@ -635,7 +798,26 @@ def render_board(data_dir, weeks_selected, season, sit):
         min_snaps = st.number_input("Min snaps", 0, 200, 1, key="bd_min")
     mode = BOARD_MODES[mode_name]
 
+    here = set(board["playerName"])
+    stored = load_watchlist()
+    watch = st.multiselect("⭐ Watchlist", sorted(here),
+                           default=[n for n in stored if n in here],
+                           key=f"bd_watch_{side}",
+                           placeholder="Star the players you keep coming back to",
+                           help="Saved to watchlist.json, so it survives a restart.")
+    # keep starred players this unit can't offer as options — otherwise a look
+    # at the defense would quietly drop every offensive player from the file
+    merged = sorted((set(stored) - here) | set(watch))
+    if merged != sorted(stored):
+        save_watchlist(merged)
+    only_watch = st.checkbox("Only my watchlist", key="bd_watch_only",
+                             disabled=not watch)
+
+    render_movers(board, weeks_selected)
+
     shown = board
+    if only_watch and watch:
+        shown = shown[shown["playerName"].isin(watch)]
     if positions:
         shown = shown[shown["Pos"].isin(positions)]
     if teams:
@@ -646,24 +828,9 @@ def render_board(data_dir, weeks_selected, season, sit):
         st.info("Nothing matches those filters.")
         return
 
-    qb_col = "w/ QB1" if side == "off" else "vs QB1"
-    sort_cols = ["Snaps", qb_col] + list(BOARD_MASKS) + ["Drives", "Team, then snaps",
-                                                         "Player"]
-    sort_by = st.selectbox("Sort by", sort_cols, key="bd_sort",
-                           help="Ratio cells are text, so clicking a column header "
-                                "sorts them alphabetically — use this instead, or "
-                                "switch Show to Counts.")
-    if sort_by == "Team, then snaps":
-        shown = shown.sort_values(["Team", "Snaps"], ascending=[True, False])
-    elif sort_by == "Player":
-        shown = shown.sort_values("playerName")
-    elif sort_by == "Drives":
-        shown = shown.sort_values("Drives", ascending=False)
-    elif sort_by == qb_col:
-        shown = shown.sort_values("q1Played", ascending=False)
-    else:
-        col = "Snaps" if sort_by == "Snaps" else f"{sort_by}Played"
-        shown = shown.sort_values(col, ascending=False)
+    # no sort control: every column sorts from its own header, including the
+    # ratio ones now that the numerators line up
+    shown = shown.sort_values("Snaps", ascending=False)
 
     table = board_display(shown, mode, side)
     st.caption(f"{len(table)} player(s)"
@@ -680,8 +847,8 @@ def render_board(data_dir, weeks_selected, season, sit):
     # otherwise coming back to the board would bounce straight out again on the
     # row still highlighted from last time.
     nonce = st.session_state.get("bd_sel_nonce", 0)
-    event = st.dataframe(table, **WIDE, hide_index=True, height=620,
-                         key=f"bd_table_{nonce}", on_select="rerun",
+    event = st.dataframe(board_styler(table, mode), **WIDE, hide_index=True,
+                         height=620, key=f"bd_table_{nonce}", on_select="rerun",
                          selection_mode="single-row")
     picked = getattr(getattr(event, "selection", None), "rows", None) or []
     if picked:
@@ -732,7 +899,7 @@ def situation_controls(plays_df):
     if situation_active(sit):
         kept = int(situation_mask(labeled, sit).sum())
         st.sidebar.caption(f"⚑ Situation filter on — {kept} of {len(labeled)} "
-                           f"pass/rush plays ({100 * kept / max(len(labeled), 1):.0f}%).")
+                           f"scrimmage plays ({100 * kept / max(len(labeled), 1):.0f}%).")
     return sit
 
 
@@ -1370,7 +1537,7 @@ WEEK_NAMES = {0: "HOF", 1: "Wk 1", 2: "Wk 2", 3: "Wk 3"}
 
 def render_team_explorer(data_dir, weeks_selected, season, sit):
     st.title("Team Explorer")
-    st.caption("Snap-count depth chart from preseason PASS/RUSH plays. "
+    st.caption("Snap-count depth chart from preseason scrimmage plays. "
                "Lower avg entry snap = on the field earlier = higher on the depth chart.")
 
     plays_pr, pp_pr, unit_sizes, pp_all = scoped(data_dir, weeks_selected, sit)
@@ -1406,7 +1573,7 @@ def render_team_explorer(data_dir, weeks_selected, season, sit):
                 continue
             unit_total = int(unit_sizes[(unit_sizes["teamId"] == team) &
                                         (unit_sizes["side"] == side)]["unitSnaps"].sum())
-            st.caption(f"{unit_total} unit PASS/RUSH snaps in the selected weeks.")
+            st.caption(f"{unit_total} unit scrimmage snaps in the selected weeks.")
 
             per = (sd.groupby("playerName")
                    .agg(Pos=("position", lambda s: s.mode().iat[0] if not s.mode().empty else "?"),
@@ -1438,7 +1605,7 @@ def render_team_explorer(data_dir, weeks_selected, season, sit):
             chart["Player"] = chart["Player"].astype(str)
             st.altair_chart(
                 alt.Chart(chart).mark_bar().encode(
-                    x=alt.X("Total:Q", title="PASS/RUSH snaps"),
+                    x=alt.X("Total:Q", title="Scrimmage snaps"),
                     y=alt.Y("Player:N", sort="-x", title=None),
                     tooltip=["Player", "Pos", "Total", "% of unit", "Avg entry snap"],
                 ).properties(height=max(220, 22 * len(chart))), **WIDE)
@@ -1447,8 +1614,9 @@ def render_team_explorer(data_dir, weeks_selected, season, sit):
             st.markdown("**Drive-by-drive**")
             st.caption("Pick a game to see who was on the field for each drive — the "
                        "cleanest rotation view: drive 1 is the first unit, later drives "
-                       "are the twos and threes. Numbers are snaps within that drive; "
-                       "drive numbers count both teams' possessions in game order.")
+                       "are the twos and threes. Numbers are snaps within that drive, "
+                       "and drives are this team's own possessions — D1 is its opening "
+                       "series, whether or not it had the ball first.")
             label_for = game_labels(pp_pr)
             games_avail = (sd[["gameId", "week"]].drop_duplicates()
                            .sort_values(["week", "gameId"]))
@@ -1456,15 +1624,15 @@ def render_team_explorer(data_dir, weeks_selected, season, sit):
             game_pick = st.selectbox(
                 "Game", game_opts, format_func=lambda g: label_for(g, team),
                 key=f"drivegame_{side}")
-            gd = sd[(sd["gameId"] == game_pick) & sd["driveNum"].notna()]
+            gd = sd[(sd["gameId"] == game_pick) & sd["teamDrive"].notna()]
             if gd.empty:
                 st.info("No drive data for this game.")
             else:
-                mat = gd.pivot_table(index="playerName", columns="driveNum",
+                mat = gd.pivot_table(index="playerName", columns="teamDrive",
                                      values="nflPlayId", aggfunc="count", fill_value=0)
                 mat.columns = [f"D{int(c)}" for c in mat.columns]
                 drive_len = (gd.drop_duplicates(["nflPlayId"])
-                             .groupby("driveNum")["nflPlayId"].count())
+                             .groupby("teamDrive")["nflPlayId"].count())
                 order = gd.groupby("playerName")["nflPlayId"].count()
                 mat = mat.loc[order.sort_values(ascending=False).index]
                 pos_map = (gd.groupby("playerName")["position"]
@@ -1617,7 +1785,7 @@ def render_player_situations(pp_all, player_name, sit):
     mine = me_all.merge(picked, on=["gameId", "nflPlayId"]) if picked is not None \
         else me_all
     if mine.empty:
-        st.info(f"He never took a pass/rush snap with {qb_pick} on the field — which "
+        st.info(f"He never took a scrimmage snap with {qb_pick} on the field — which "
                 "is its own answer about whose group he was running with.")
         return
 
@@ -1733,15 +1901,15 @@ plays_pr, pp_pr, unit_sizes, pp_all = scoped(data_dir, weeks_selected, sit)
 
 me = pp_pr[pp_pr["playerName"].str.lower() == player_name.lower()]
 if me.empty:
-    st.info("No PASS/RUSH snaps for this player with the current week "
+    st.info("No scrimmage snaps for this player with the current week "
             "and situation filter.")
     st.stop()
 
 # ---------- Header metrics ----------
 st.subheader(player_name)
-st.caption("Everything on this page counts **real pass/rush snaps only** (kickoffs, "
-           "punts, kneels and nullified penalty plays are excluded), limited to the "
-           "weeks selected in the sidebar.")
+st.caption("Everything on this page counts **scrimmage snaps only** — pass, rush and "
+           "sack plays; kickoffs, punts, kneels and nullified penalty plays are "
+           "excluded — limited to the weeks selected in the sidebar.")
 off_snaps = int((me["side"] == "off").sum())
 def_snaps = int((me["side"] == "def").sum())
 teams = ", ".join(sorted({team_label(t) for t in me["teamId"].unique()}))
@@ -1834,7 +2002,7 @@ with tab_start:
     per_game["Unit"] = per_game["side"].map({"off": "Offense", "def": "Defense"})
 
     st.markdown("**Per-game usage**")
-    st.caption("One row per game and unit. **Unit snaps** = how many pass/rush snaps his "
+    st.caption("One row per game and unit. **Unit snaps** = how many scrimmage snaps his "
                "team's offense (or defense) ran that game · **Snaps / share %** = how many "
                "of those he was on the field for · **Entered / exited on snap #** = when he "
                "came on and left, counted in his unit's snap order — entering on snap 1 "
@@ -1870,22 +2038,22 @@ with tab_start:
             **WIDE)
 
     # drives he took part in
-    if me["driveNum"].notna().any():
+    if me["teamDrive"].notna().any():
         st.markdown("**Drives played**")
-        st.caption("Which possessions he was on the field for. Drive numbers count both "
-                   "teams' possessions in game order (D1 = the game's first drive); "
-                   "drive length = that drive's pass/rush snaps.")
-        drive_lens = (pp_pr.drop_duplicates(["gameId", "nflPlayId"])
-                      .groupby(["gameId", "driveNum"])["nflPlayId"].count()
-                      .rename("Drive length").reset_index())
-        dr = (me[me["driveNum"].notna()]
-              .groupby(["gameId", "teamId", "side", "driveNum"], as_index=False)
+        st.caption("Which possessions he was on the field for, numbered as his own "
+                   "unit's series — D1 is the team's opening drive, whether or not it "
+                   "had the ball first; drive length = that drive's snaps.")
+        drive_lens = (pp_pr.drop_duplicates(["gameId", "nflPlayId", "teamId", "side"])
+                      .groupby(["gameId", "teamId", "side", "teamDrive"])["nflPlayId"]
+                      .count().rename("Drive length").reset_index())
+        dr = (me[me["teamDrive"].notna()]
+              .groupby(["gameId", "teamId", "side", "teamDrive"], as_index=False)
               .agg(snaps=("nflPlayId", "nunique")))
-        dr = dr.merge(drive_lens, on=["gameId", "driveNum"], how="left")
-        dr = dr.sort_values(["gameId", "driveNum"])
+        dr = dr.merge(drive_lens, on=["gameId", "teamId", "side", "teamDrive"], how="left")
+        dr = dr.sort_values(["gameId", "teamDrive"])
         dr["Game"] = [label_for(g, t) for g, t in zip(dr["gameId"], dr["teamId"])]
         dr["Unit"] = dr["side"].map({"off": "Offense", "def": "Defense"})
-        dr["Drive"] = dr["driveNum"].astype(int).map("D{}".format)
+        dr["Drive"] = dr["teamDrive"].astype(int).map("D{}".format)
         show_dr = dr.rename(columns={"snaps": "His snaps"})
         st.dataframe(show_dr[["Game", "Unit", "Drive", "His snaps", "Drive length"]],
                      **WIDE, hide_index=True,
@@ -1967,7 +2135,15 @@ with tab_plays:
                       .agg(", ".join).rename("Teammates on field"))
             plays_involving = plays_involving.merge(joined, on=["gameId", "nflPlayId"], how="left")
 
-        plays_involving["Drive"] = plays_involving["driveNum"].astype("Int64")
+        # his unit's own drive number, matching every other view
+        own_drives = (me[["gameId", "nflPlayId", "teamDrive"]].drop_duplicates()
+                      if "teamDrive" in me.columns else None)
+        if own_drives is not None:
+            plays_involving = plays_involving.merge(own_drives,
+                                                    on=["gameId", "nflPlayId"], how="left")
+            plays_involving["Drive"] = plays_involving["teamDrive"].astype("Int64")
+        else:
+            plays_involving["Drive"] = plays_involving["driveNum"].astype("Int64")
         show_cols = [c for c in ["gameId", "week", "Drive", "nflPlayId", "nflPlayType",
                                  "Down & distance", "Field zone", "Off personnel",
                                  "Def personnel", "nflPlayDescription",

@@ -124,7 +124,45 @@ SITUATION_COLS = [
     "isRedzone", "possessionTeamId", "offScore", "defScore",
     "expectedPointsAdded", "offN", "offRB", "offTE", "offWR", "offOL",
     "defN", "defDL", "defLB", "defDB",
+    "rusher", "target", "receiver", "passer", "touchYards",
 ]
+
+# NFL GSIS stat ids, confirmed against the play descriptions in this data
+# rather than taken on faith: on 90 plays, id 10 landed on exactly the player
+# the description had rushing, 115 on the intended receiver whether or not he
+# caught it, and 21/22 only on completions.
+STAT_RUSH = {10, 11}        # 11 is the same with a touchdown
+STAT_RECEPTION = {21, 22}
+STAT_TARGET = {115}         # thrown at him, caught or not
+# every way a dropback ends, so `passer` covers attempts rather than only the
+# ones that worked: 14 sat on the quarterback for 128 incompletions and 20 for
+# 26 sacks in this data, which is how they earned their place here
+STAT_PASS = {14, 15, 16, 19, 20}
+
+
+def touches(play, players_by_gsis):
+    """Who touched the ball: rusher / target / receiver / passer, by name.
+
+    Snap counts say a player was out there; this says the ball came to him,
+    which for a skill player is the difference between being on the field and
+    having a role. Comes from the API's own stat lines, so it needs no name
+    matching — gsisId is the same id the lineup rows carry.
+    """
+    out = {"rusher": "", "target": "", "receiver": "", "passer": "", "touchYards": ""}
+    for stat in play.get("playStats") or []:
+        name = players_by_gsis.get(stat.get("gsisId"))
+        if not name:
+            continue
+        sid = stat.get("statId")
+        if sid in STAT_RUSH:
+            out["rusher"], out["touchYards"] = name, stat.get("yards")
+        elif sid in STAT_RECEPTION:
+            out["receiver"], out["touchYards"] = name, stat.get("yards")
+        elif sid in STAT_TARGET:
+            out["target"] = name
+        elif sid in STAT_PASS:
+            out["passer"] = name
+    return out
 
 
 def team_abbrs(path="teams.csv"):
@@ -236,7 +274,10 @@ def main():
                 "nflPlayType": pl.get("nflPlayType", ""),
                 "nflPlayDescription": pl.get("nflPlayDescription", ""),
             }
-            sit = situation_row(pl, off_list, def_list, abbrs)
+            by_gsis = {p.get("gsisId"): p.get("playerName", "")
+                       for p in list(off_list) + list(def_list) if p.get("gsisId")}
+            sit = {**situation_row(pl, off_list, def_list, abbrs),
+                   **touches(pl, by_gsis)}
             plays_rows.append({**base, "nflPlayUrl": pl.get("nflPlayUrl", ""), **sit})
 
             wide = {**base, "nflPlayUrl": pl.get("nflPlayUrl", ""), **sit}

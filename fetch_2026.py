@@ -369,6 +369,19 @@ SITUATION_KEYS = ("quarter", "down", "yardsToGo", "gameClock",
                   "possessionTeamId", "expectedPoints", "expectedPointsAdded")
 
 
+def play_stats(summary):
+    """Per-player stat lines: [{gsisId, statId, yards}].
+
+    This is who actually touched the ball, keyed by the same gsisId the lineup
+    rows carry — so a carry or a target attaches to a player without matching
+    "R.Fairweather" against a roster. Rows without a gsisId are team-level
+    (penalties and the like) and carry no player to attach anything to.
+    """
+    stats = ((summary or {}).get("play") or {}).get("playStats") or []
+    return [{"gsisId": s["gsisId"], "statId": s.get("statId"), "yards": s.get("yards")}
+            for s in stats if s.get("gsisId")]
+
+
 def situation_fields(summary):
     """Down/distance/field-position/score fields out of a summaryPlay response.
 
@@ -380,6 +393,7 @@ def situation_fields(summary):
     home, visitor = sp.get("preSnapHomeScore"), sp.get("preSnapVisitorScore")
     off, dfn = (home, visitor) if summary.get("homeIsOffense") else (visitor, home)
     out["offScore"], out["defScore"] = off, dfn
+    out["playStats"] = play_stats(summary)
     return out
 
 

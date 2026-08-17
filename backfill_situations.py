@@ -28,7 +28,9 @@ import requests
 from fetch_2026 import get_json, situation_fields
 
 DEFAULT_TARGETS = ["games_2026", "."]
-MARKER = "possessionTeamId"  # present == this play has already been backfilled
+# every field this script fills — a play counts as done only when it has them
+# all, so adding one here is what makes an existing file eligible again
+MARKER = ("possessionTeamId", "playStats")
 
 _local = threading.local()
 
@@ -70,7 +72,7 @@ def backfill_game(path, workers, force):
     with open(path, encoding="utf-8") as f:
         game = json.load(f)
     plays = game.get("plays") or []
-    todo = [p for p in plays if force or MARKER not in p]
+    todo = [p for p in plays if force or not all(k in p for k in MARKER)]
     skipped = len(plays) - len(todo)
     if not todo:
         print(f"{os.path.basename(path)}: {skipped} plays already done, skipping")
