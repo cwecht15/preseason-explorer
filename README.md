@@ -97,11 +97,19 @@ repo and wipes its own filesystem on restart, so nothing you fetch there would
 survive or be visible anyway.
 
 1. **NFL Pro token.** The Authorization bearer is a JWT good for about an hour,
-   so it's usually what's broken. On pro.nfl.com while logged in: DevTools →
-   Network → click any `/api/secured/…` request → right-click → Copy → Copy as
-   cURL, paste it in the box, **Save auth**. The paste is validated before it's
-   written, so junk or an already-dead token can't clobber a working
-   `auth.txt`. **Test auth** spends one real request for a definitive answer.
+   so it's usually what's broken. The step links straight to
+   [pro.nfl.com/stats/team-offense/season](https://pro.nfl.com/stats/team-offense/season),
+   which calls `/api/secured/…` as it loads — so there's always a live request
+   to copy instead of clicking around looking for a page that makes one. Log
+   in if asked, then DevTools → Network → filter on `secured` → right-click the
+   top row → Copy → Copy as cURL, paste it in the box, **Save auth**. Any
+   secured request works; they all carry the same bearer. The paste is
+   validated before it's written, so junk or an already-dead token can't
+   clobber a working `auth.txt`. **Test auth** spends one real request for a
+   definitive answer.
+
+   The token isn't in any cookie, so the DevTools copy can't be automated away —
+   it's a browser-issued JWT that only the site's own scripts ever hold.
 2. **Fetch + preprocess.** Runs `fetch_2026.py` then `preprocess_2026.py`.
    Games already in `games_2026/` are skipped, so re-running is cheap.
    Disabled while the token is bad.

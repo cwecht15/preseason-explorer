@@ -7,12 +7,14 @@ see situation_fields; backfill_situations.py adds those to older files).
 
 Auth: only the play-list endpoint (/api/secured/plays/playlist/game) needs a
 logged-in NFL Pro session. Everything else (schedule, summaryPlay lineups) is
-public. To supply auth, open pro.nfl.com in Chrome while logged in, open
-DevTools > Network, click any request to pro.nfl.com/api/..., right-click >
-Copy > Copy as cURL, and paste the whole thing into a file named auth.txt in
-this folder. This script pulls the Cookie and Authorization headers out of it.
-(The app's sidebar "Update 2026 data" panel does the same paste with a validity
-check; the Authorization bearer is a JWT good for about an hour.)
+public. To supply auth, open https://pro.nfl.com/stats/team-offense/season in
+Chrome while logged in — that page calls /api/secured/... as it loads, so a
+request to copy is always there — then DevTools > Network, filter on "secured",
+right-click the top row > Copy > Copy as cURL, and paste the whole thing into a
+file named auth.txt in this folder. This script pulls the Cookie and
+Authorization headers out of it. Any secured request will do; they all carry
+the same bearer, a JWT good for about an hour. (The app's "Update data" view
+does the same paste behind a validity check, and links straight to that page.)
 
 Usage:
     python fetch_2026.py            # fetch all completed 2026 preseason games

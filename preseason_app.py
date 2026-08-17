@@ -713,6 +713,14 @@ def render_coverage(season, data_dir):
     st.dataframe(table, **WIDE, hide_index=True)
 
 
+# Where to send someone for a fresh token. Any /api/secured/… request carries
+# the same bearer, and this page fires one (secured/stats/team-offense/overview
+# /season) as it loads — so there is always a row to copy, instead of clicking
+# around pro.nfl.com looking for a page that happens to make a secured call.
+# The token is not in any cookie, so DevTools genuinely can't be skipped.
+TOKEN_URL = "https://pro.nfl.com/stats/team-offense/season"
+
+
 def update_headline():
     """(headline, token status, stale?, publish status) — which step is waiting.
 
@@ -765,15 +773,23 @@ def render_update_view(season, data_dir):
         st.markdown(f"**1 · NFL Pro token** — {icon} {status['short']}")
         st.caption(status["message"])
 
+        st.link_button("Open pro.nfl.com stats ↗", TOKEN_URL, **WIDE)
+        st.markdown(
+            "1. Open that page and log in if it asks. It calls `/api/secured/…` "
+            "while it loads, so there's always a live request sitting there to "
+            "copy — no hunting for a page that happens to make one.\n"
+            "2. **F12** → **Network** tab → type `secured` in the filter box.\n"
+            "3. Right-click the top row → **Copy** → **Copy as cURL**.\n"
+            "4. Paste it below and hit **Save auth**.")
+
         # Paste box. The key carries a nonce so saving can blank the widget —
         # Streamlit forbids writing to a widget's state after it is drawn.
         nonce = st.session_state.get("auth_nonce", 0)
         pasted = st.text_area(
             "NFL Pro auth", key=f"auth_paste_{nonce}", height=110,
             placeholder="curl 'https://pro.nfl.com/api/secured/...' -H 'Cookie: ...' …",
-            help="pro.nfl.com logged in → DevTools → Network → click any "
-                 "/api/secured/… request → right-click → Copy → Copy as cURL. "
-                 "The token is good for about an hour.")
+            help="Any /api/secured/… request will do — they all carry the same "
+                 "bearer token, which is good for about an hour.")
 
         unsaved = bool(pasted.strip())
         if unsaved:
