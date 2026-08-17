@@ -610,36 +610,158 @@ def publish_data(files):
                   "usually within a minute or two.")
 
 
-def render_update_panel():
-    # imported lazily: fetch_2026 needs `requests`, which the hosted app skips
+# ---------- Coverage: is every game for a week actually in? ----------
+# The fetch prints what it did and then the console scrolls away, which leaves
+# no way to answer "did all 16 week-2 games land?" after the fact. This asks
+# the schedule and compares it against the data the app is actually serving.
+
+@st.cache_data(ttl=600, show_spinner=False)
+def schedule_for(season, nonce=0):
+    """The API's preseason schedule. `nonce` is how the Re-check button busts it."""
     if APP_DIR not in sys.path:
         sys.path.insert(0, APP_DIR)
-    from fetch_2026 import (auth_status, check_auth_live, parse_auth_headers,
-                            save_auth_text)
+    from fetch_2026 import scheduled_games
+    return scheduled_games(season)
+
+
+@st.cache_data(show_spinner=False)
+def games_in_data(data_dir, fingerprint=None):
+    """gameId -> the API's game uuid, read back out of each play's NFL Pro link.
+
+    Taken from the CSVs rather than the game JSONs so this works for any season
+    and on the hosted app, which serves data whose raw JSONs aren't committed.
+    """
+    plays, _ = load_all(data_dir)
+    first = plays.dropna(subset=["nflPlayUrl"]).drop_duplicates("gameId")
+    uuid = first["nflPlayUrl"].str.extract(r"gameId=([0-9a-f-]+)", expand=False)
+    return pd.DataFrame({"gameId": first["gameId"].values, "week": first["week"].values,
+                         "uuid": uuid.values}).dropna(subset=["uuid"])
+
+
+@st.cache_data(show_spinner=False)
+def smart_id_abbr(fingerprint=None):
+    """smartId -> abbr, for naming games the schedule lists but the data lacks."""
+    if not os.path.exists(TEAMS_CSV):
+        return {}
+    t = pd.read_csv(TEAMS_CSV, dtype=str)
+    if "smartId" not in t.columns:
+        return {}
+    return {r.smartId: r.abbr for r in t.itertuples()
+            if pd.notna(r.smartId) and pd.notna(r.abbr)}
+
+
+def coverage(season, data_dir, nonce=0):
+    """Per week: scheduled / final / in the data, plus the finals that are missing."""
+    sched = schedule_for(season, nonce)
+    if not sched or not sched.get("weeks"):
+        return None
+    have = set(games_in_data(
+        data_dir, fingerprint=file_fingerprint(os.path.join(data_dir, "plays_unique.csv")))
+        ["uuid"])
+    abbr = smart_id_abbr(fingerprint=file_fingerprint(TEAMS_CSV))
+    name = lambda g: f"{abbr.get(g['away'], '?')} @ {abbr.get(g['home'], '?')}"
+
+    rows = []
+    for w in sched["weeks"]:  # every week, including any the API hasn't filled in
+        wk = [g for g in sched["games"] if g["week"] == w["week"]]
+        final = [g for g in wk if g["final"]]
+        missing = [g for g in final if g["gameId"] not in have]
+        rows.append({
+            "Week": WEEK_NAMES.get(w["week"], w["slug"] or str(w["week"])),
+            "Scheduled": len(wk),
+            "Final": len(final),
+            "In the data": len(final) - len(missing),
+            "Not played yet": len(wk) - len(final),
+            "Missing": ", ".join(name(g) for g in missing)
+                       or ("— not scheduled yet" if not wk else ""),
+        })
+    return pd.DataFrame(rows)
+
+
+def render_coverage(season, data_dir):
+    st.subheader("Coverage")
+    st.caption("Every preseason game the NFL schedule lists for this season, against "
+               "what this app is actually serving. A week is only complete when "
+               "**In the data** matches **Final** — games that haven't kicked off yet "
+               "aren't missing, they just haven't happened.")
+    nonce = st.session_state.get("cov_nonce", 0)
+    if st.button("Re-check the schedule",
+                 help="Results are cached for ten minutes; this asks again now."):
+        st.session_state["cov_nonce"] = nonce + 1
+        st.rerun()
+    try:
+        with st.spinner("Asking pro.nfl.com for the schedule…"):
+            table = coverage(season, data_dir, nonce)
+    except Exception as e:  # offline, DNS, API shape change - never blocks the page
+        st.warning(f"Couldn't reach the schedule endpoint, so coverage is unknown "
+                   f"this time ({type(e).__name__}). The data itself is unaffected.")
+        return
+    if table is None or table.empty:
+        st.info(f"The API lists no preseason games for {season} yet.")
+        return
+
+    gaps = table[table["In the data"] < table["Final"]]
+    total_final, total_have = int(table["Final"].sum()), int(table["In the data"].sum())
+    if gaps.empty:
+        unplayed = int(table["Not played yet"].sum())
+        st.success(f"All {total_final} completed game(s) are in"
+                   + (f" — {unplayed} still to be played." if unplayed else "."))
+    else:
+        st.error(f"{total_final - total_have} completed game(s) missing: "
+                 + " · ".join(f"{r.Week} {r.Missing}" for r in gaps.itertuples())
+                 + ". Run step 2 below.")
+    st.dataframe(table, **WIDE, hide_index=True)
+
+
+def update_headline():
+    """(headline, token status, stale?, publish status) — which step is waiting.
+
+    Unpublished data outranks a dead token: it means the hosted app is actively
+    showing something older than what's on this machine.
+    """
+    if APP_DIR not in sys.path:
+        sys.path.insert(0, APP_DIR)
+    from fetch_2026 import auth_status
 
     status = auth_status()
-    icon = {"ok": "✅", "unknown": "❔", "expired": "⛔",
-            "missing": "⚠️", "unparsed": "⚠️"}[status["state"]]
     stale = status["state"] in ("expired", "missing", "unparsed")
     pub = publish_status()
-
-    # The header says which step is waiting on you, so the sidebar answers
-    # "what do I have to do?" without being opened.
-    # Unpublished data outranks a dead token: it means the hosted app is
-    # actively showing something older than what's on this machine.
     if pub["state"] in ("dirty", "ahead"):
         head = f"📤 step 3: {pub['short']}"
     elif stale:
-        head = f"{icon} step 1: new token needed"
+        head = "⛔ step 1: new token needed"
     else:
         head = f"✅ ready — token {status['short']}"
+    return head, status, stale, pub
 
-    with st.sidebar.expander(f"⬇️ Update 2026 data — {head}",
-                             expanded=stale or pub["state"] == "dirty"):
-        st.caption("Run all three steps here. Nothing you fetch shows up on the "
-                   "hosted app until step 3 pushes it — Streamlit Cloud reads the "
-                   "data out of the repo, not off this machine.")
 
+def render_update_view(season, data_dir):
+    st.title("Update data")
+    render_coverage(season, data_dir)
+    st.divider()
+
+    if not running_locally():
+        st.info("The fetch and publish steps are local-only. This deployment is "
+                "public, so a token box on it would be a token box for anyone who "
+                "finds the URL — and Streamlit Cloud wipes its filesystem on "
+                "restart, so nothing fetched here would survive anyway. Run "
+                "`start_app.bat` on your machine to update the data.")
+        return
+
+    # imported lazily: fetch_2026 needs `requests`, which the hosted app skips
+    if APP_DIR not in sys.path:
+        sys.path.insert(0, APP_DIR)
+    from fetch_2026 import check_auth_live, parse_auth_headers, save_auth_text
+
+    head, status, stale, pub = update_headline()
+    icon = {"ok": "✅", "unknown": "❔", "expired": "⛔",
+            "missing": "⚠️", "unparsed": "⚠️"}[status["state"]]
+    st.subheader(f"Update 2026 data — {head}")
+    st.caption("Run all three steps here. Nothing you fetch shows up on the "
+               "hosted app until step 3 pushes it — Streamlit Cloud reads the "
+               "data out of the repo, not off this machine.")
+
+    with st.container(border=True):
         st.markdown(f"**1 · NFL Pro token** — {icon} {status['short']}")
         st.caption(status["message"])
 
@@ -687,11 +809,12 @@ def render_update_panel():
         if saved:
             st.success(f"Auth saved. {saved}")
 
-        st.divider()
+    with st.container(border=True):
         st.markdown("**2 · Fetch new games**")
         st.caption("Downloads any completed preseason game you don't have yet into "
                    "games_2026/, then rebuilds data_2026/*.csv. Games already on "
-                   "disk are skipped, so re-running is cheap.")
+                   "disk are skipped, so re-running is cheap — and the coverage "
+                   "table above is how you check it caught everything.")
         if st.button("Fetch + preprocess", disabled=stale, **WIDE,
                      help="Refresh the token first (step 1)" if stale else
                           "Runs fetch_2026.py, then preprocess_2026.py"):
@@ -704,7 +827,7 @@ def render_update_panel():
                     box.update(label="Data updated — now publish it (step 3)", state="complete")
                     st.cache_data.clear()
 
-        st.divider()
+    with st.container(border=True):
         # recomputed: a fetch in this same run may have just changed the answer
         pub = publish_status()
         target = push_target()
@@ -1206,7 +1329,19 @@ def render_player_situations(pp_all, player_name, sit):
 
 
 # ---------- Sidebar ----------
-view = st.sidebar.radio("View", ["Player Explorer", "Team Explorer", "Starter Trends"])
+view = st.sidebar.radio(
+    "View", ["Player Explorer", "Team Explorer", "Starter Trends", "Update data"])
+
+# The update view is a page of its own, so the sidebar only carries the one line
+# that used to be the panel's header: which step is waiting on you, from wherever
+# you happen to be standing.
+if os.path.exists(os.path.join(APP_DIR, "fetch_2026.py")) and running_locally():
+    try:
+        st.sidebar.caption(f"Data pipeline — {update_headline()[0]} "
+                           "· see **Update data**")
+    except Exception:
+        pass
+
 if view == "Starter Trends":
     render_starter_trends()
     st.stop()
@@ -1230,15 +1365,16 @@ if st.sidebar.button("🔄 Refresh data (clear cache)"):
 
 sit = situation_controls(plays_df)
 
-# ---------- Sidebar: update pipeline ----------
-if running_locally() and os.path.exists(os.path.join(APP_DIR, "fetch_2026.py")):
-    render_update_panel()
+try:
+    season_num = int(season_label[:4])
+except ValueError:
+    season_num = 0
+
+if view == "Update data":
+    render_update_view(season_num, data_dir)
+    st.stop()
 
 if view == "Team Explorer":
-    try:
-        season_num = int(season_label[:4])
-    except ValueError:
-        season_num = 0
     render_team_explorer(data_dir, weeks_selected, season_num, sit)
     st.stop()
 

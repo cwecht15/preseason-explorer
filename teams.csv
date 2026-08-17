@@ -1,35 +1,35 @@
-teamId,abbr,fullName
-8600,AFC,AFC Pro Bowl Team
-3800,AZ,Arizona Cardinals
-0200,ATL,Atlanta Falcons
-0325,BAL,Baltimore Ravens
-0610,BUF,Buffalo Bills
-0750,CAR,Carolina Panthers
-0810,CHI,Chicago Bears
-0920,CIN,Cincinnati Bengals
-1050,CLE,Cleveland Browns
-1200,DAL,Dallas Cowboys
-1400,DEN,Denver Broncos
-1540,DET,Detroit Lions
-1800,GB,Green Bay Packers
-2120,HOU,Houston Texans
-2200,IND,Indianapolis Colts
-2250,JAX,Jacksonville Jaguars
-2310,KC,Kansas City Chiefs
-2520,LV,Las Vegas Raiders
-2510,LAR,Los Angeles Rams
-4400,LAC,Los Angeles Chargers
-2700,MIA,Miami Dolphins
-3000,MIN,Minnesota Vikings
-8700,NFC,NFC Pro Bowl Team
-3200,NE,New England Patriots
-3300,NO,New Orleans Saints
-3430,NYJ,New York Jets
-3410,NYG,New York Giants
-3700,PHI,Philadelphia Eagles
-3900,PIT,Pittsburgh Steelers
-4500,SF,San Francisco 49ers
-4600,SEA,Seattle Seahawks
-4900,TB,Tampa Bay Buccaneers
-2100,TEN,Tennessee Titans
-5110,WAS,Washington Commanders
+teamId,abbr,fullName,smartId
+8600,AFC,AFC Pro Bowl Team,10408600-77a1-8b0f-8f54-99b7e0a7d1b2
+3800,AZ,Arizona Cardinals,10403800-517c-7b8c-65a3-c61b95d86123
+0200,ATL,Atlanta Falcons,10400200-f401-4e53-5175-0974e4f16cf7
+0325,BAL,Baltimore Ravens,10400325-48de-3d6a-be29-8f829437f4c8
+0610,BUF,Buffalo Bills,10400610-c40e-a673-1743-2ce2a5d5d731
+0750,CAR,Carolina Panthers,10400750-259b-33ac-eee3-a3852e83cd1f
+0810,CHI,Chicago Bears,10400810-db30-43d6-221c-620006f3ca19
+0920,CIN,Cincinnati Bengals,10400920-57c1-7656-e77e-1af3d900483e
+1050,CLE,Cleveland Browns,10401050-5e38-b907-1be1-55b91b19c057
+1200,DAL,Dallas Cowboys,10401200-a308-98ca-ad5f-95df2fefea68
+1400,DEN,Denver Broncos,10401400-b89b-96e5-55d1-caa7e18de3d8
+1540,DET,Detroit Lions,10401540-f97c-2d19-6fcd-fac6490a48b7
+1800,GB,Green Bay Packers,10401800-ab22-323d-721a-cee4713c4c2d
+2120,HOU,Houston Texans,10402120-b0bc-693d-098a-803014096eb0
+2200,IND,Indianapolis Colts,10402200-2ea3-84c3-e627-6a6b3b39d56d
+2250,JAX,Jacksonville Jaguars,10402250-89fe-7b86-ef98-9062cd354256
+2310,KC,Kansas City Chiefs,10402310-a47e-10ea-7442-16b633633637
+2520,LV,Las Vegas Raiders,10402520-96bf-e9f2-4f68-8521ca896060
+2510,LAR,Los Angeles Rams,10402510-8931-0d5f-9815-79bb79649a65
+4400,LAC,Los Angeles Chargers,10404400-3b35-073f-197e-194bb8240723
+2700,MIA,Miami Dolphins,10402700-1662-d8ad-f45c-0b0ea460d045
+3000,MIN,Minnesota Vikings,10403000-5851-f9d5-da45-78365a05b6b0
+8700,NFC,NFC Pro Bowl Team,10408700-5035-ce5c-b3dd-20413011bc6a
+3200,NE,New England Patriots,10403200-69ab-9ea6-5af5-e240fbc08bea
+3300,NO,New Orleans Saints,10403300-f235-cf9b-6d3a-2f182be48dd1
+3430,NYJ,New York Jets,10403430-1bc3-42c4-c7d8-39f38aed5f12
+3410,NYG,New York Giants,10403410-997c-9c75-256b-3b012f468bd0
+3700,PHI,Philadelphia Eagles,10403700-b939-3cbd-3d16-24d4d6742fa2
+3900,PIT,Pittsburgh Steelers,10403900-8251-6892-d81c-4348525c2d47
+4500,SF,San Francisco 49ers,10404500-e7cb-7fce-3f10-4eeb269bd179
+4600,SEA,Seattle Seahawks,10404600-adcd-28ac-5826-b4d95ec2a228
+4900,TB,Tampa Bay Buccaneers,10404900-d59e-b449-ef75-961e09ca027e
+2100,TEN,Tennessee Titans,10402100-447f-396e-8149-0a434ffb2f23
+5110,WAS,Washington Commanders,10405110-ec3c-669e-2614-db3dc1736e95

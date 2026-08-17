@@ -21,7 +21,9 @@ Usage:
 
 import argparse
 import base64
+import csv
 import datetime
+import glob
 import json
 import os
 import re
@@ -246,6 +248,93 @@ def normalize_play_type(raw, description=""):
     return raw or "UNKNOWN"
 
 
+def scheduled_games(season=SEASON, session=None):
+    """What the API says the preseason is: {"weeks": [...], "games": [...]}.
+
+    The week list comes back separately from the games because a week the
+    schedule knows about but hasn't populated yet ("no week 2 games listed")
+    is a different answer from a week with games missing, and a row that
+    simply isn't there can't say either.
+
+    Public endpoints only — no NFL Pro token — so the app can check its own
+    coverage anywhere, including the hosted deployment where the fetch buttons
+    are hidden. Team ids here are the long "smartId" form, which is what the
+    game files store as away/homeTeamId.
+    """
+    session = session or requests.Session()
+    weeks = get_json(session, f"{BASE}/api/schedules/weeks", params={"season": season})
+    pre = [w for w in (weeks or {}).get("weeks", []) if w.get("seasonType") == "PRE"]
+    games = []
+    for w in pre:
+        data = get_json(session, f"{BASE}/api/scores/live/games",
+                        params={"season": season, "seasonType": "PRE", "week": w["week"]})
+        for g in (data or {}).get("games", []):
+            games.append({
+                "week": w["week"],
+                "weekSlug": w.get("weekSlug", ""),
+                "gameId": g.get("gameId"),
+                "away": (g.get("awayTeam") or {}).get("teamId"),
+                "home": (g.get("homeTeam") or {}).get("teamId"),
+                "final": g.get("gameState") == "POST" or g.get("phase") == "FINAL",
+                "status": g.get("displayStatus") or "",
+                "startTime": g.get("startTime") or "",
+            })
+    return {"weeks": [{"week": w["week"], "slug": w.get("weekSlug", "")} for w in pre],
+            "games": games}
+
+
+def games_on_disk(out_dir=OUT_DIR):
+    """fapiGameId -> filename, for everything already fetched."""
+    have = {}
+    for path in sorted(glob.glob(os.path.join(out_dir, "game_*.json"))):
+        try:
+            with open(path, encoding="utf-8") as f:
+                have[json.load(f).get("fapiGameId")] = os.path.basename(path)
+        except (OSError, ValueError):
+            continue
+    return have
+
+
+def team_abbrs(path=None):
+    """smartId -> abbr, out of teams.csv, for naming games in the report."""
+    path = path or os.path.join(os.path.dirname(os.path.abspath(__file__)), "teams.csv")
+    if not os.path.exists(path):
+        return {}
+    with open(path, encoding="utf-8") as f:
+        rows = list(csv.DictReader(f))
+    return {r["smartId"]: r["abbr"] for r in rows if r.get("smartId")}
+
+
+def coverage_report(season=SEASON, session=None, out_dir=OUT_DIR):
+    """Print per-week 'N of M final games on disk'. -> count still missing.
+
+    Printed at the end of a fetch so the run finishes with a straight answer
+    about whether a week is complete, rather than leaving it to be inferred
+    from a scroll of per-game lines.
+    """
+    sched = scheduled_games(season, session)
+    have, abbr = games_on_disk(out_dir), team_abbrs()
+    missing_total = 0
+    print(f"coverage for {season} preseason ({out_dir}/):")
+    for w in sched["weeks"]:
+        wk = [g for g in sched["games"] if g["week"] == w["week"]]
+        final = [g for g in wk if g["final"]]
+        missing = [g for g in final if g["gameId"] not in have]
+        missing_total += len(missing)
+        if not wk:
+            print(f"  {w['slug']:>4}: no games listed yet")
+            continue
+        note = f", {len(wk) - len(final)} not played yet" if len(wk) > len(final) else ""
+        print(f"  {w['slug']:>4}: {len(final) - len(missing)} of {len(final)} "
+              f"final game(s) on disk{note}"
+              + ("" if not missing else "  MISSING " + ", ".join(
+                  f"{abbr.get(g['away'], '?')}@{abbr.get(g['home'], '?')}"
+                  for g in missing)))
+    print("all completed games are on disk" if not missing_total
+          else f"{missing_total} completed game(s) still missing")
+    return missing_total
+
+
 def fetch_playlist(session, auth, game_uuid):
     """Return the ordered play list for a game (requires NFL Pro auth)."""
     url = f"{BASE}/api/secured/plays/playlist/game"
@@ -348,7 +437,12 @@ def build_game_json(session, auth, seq_game_id, game, week, week_slug):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--week", type=int, default=None, help="preseason week (0=HOF)")
+    ap.add_argument("--check", action="store_true",
+                    help="only report which scheduled games are on disk, fetch nothing")
     args = ap.parse_args()
+
+    if args.check:  # public endpoints only, so this works with a dead token
+        sys.exit(1 if coverage_report() else 0)
 
     status = auth_status()
     print(f"auth: {status['message']}")
@@ -401,6 +495,7 @@ def main():
             json.dump(gj, f)
         print(f"  wrote {out_path} ({len(gj['plays'])} plays)")
 
+    coverage_report(session=session)
     print("Done. Now run: python preprocess_2026.py")
 
 

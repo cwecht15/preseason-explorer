@@ -14,6 +14,9 @@ rotations. Hosted on Streamlit Community Cloud.
   snaps by down & distance, field zone or personnel.
 - **Starter Trends** — how much each team/coach plays its real week-1 starters,
   2024–2025, with a 2026 coach-by-coach outlook.
+- **Update data** — coverage (is every game for a week actually in?) and the
+  three-step fetch/publish pipeline. Coverage works anywhere; the pipeline
+  steps are local-only.
 
 ### Situations
 
@@ -44,19 +47,54 @@ Personnel is counted off the positions the NFL lists players at, not where they
 actually lined up — a fullback counts as an RB, a tackle-eligible package reads
 as six linemen — so "11 personnel" here means 1 RB and 1 TE by roster listing.
 
+## Running it locally
+
+Double-click **`start_app.bat`**. It cd's to the repo, installs anything
+missing from `requirements.txt`, starts Streamlit and opens the browser; the
+console window it leaves behind is the server, so keep it open while you use
+the app and close it (or Ctrl+C) to stop. If it fails, the window stays up with
+the error rather than blinking shut.
+
+The equivalent by hand is still `streamlit run preseason_app.py` from this
+folder.
+
 ## Data pipeline
 
 All from the pro.nfl.com API. Only the play-list endpoint needs an NFL Pro
 login: paste a Chrome "Copy as cURL" into `auth.txt` (gitignored).
 
+### Coverage — did every game land?
+
+The **Update data** view opens with a per-week table: how many games the NFL
+schedule lists, how many are final, and how many of those are in the data the
+app is serving. A week is complete when *In the data* equals *Final*; games
+that haven't kicked off yet are counted separately rather than as missing, and
+a week the schedule hasn't populated yet says so instead of vanishing from the
+table. Any gap is named by matchup — *"2 completed game(s) missing: Wk 1 AZ @
+LV, CAR @ BUF"* — so you know what to re-fetch.
+
+It matches on the API's game id, which every play in the CSVs carries in its
+NFL Pro link, so it checks the data actually being served rather than what
+happens to be on disk. Only public endpoints are involved: it works with a dead
+token, and on the hosted app, where it answers "did everything get published?".
+
+The same check from a terminal, exit code 1 if anything is missing:
+
+```
+python fetch_2026.py --check
+```
+
+A normal `fetch_2026.py` run ends with that report too, so a fetch finishes with
+a straight answer instead of a scroll of per-game lines.
+
 ### Updating the data
 
-Run the local app (`streamlit run preseason_app.py`) and use the sidebar's
-**⬇️ Update 2026 data** panel. Its header always names the step that's waiting
-on you — `⛔ step 1: new token needed`, `📤 step 3: 4 file(s) to publish`, or
-`✅ ready`. All three steps have to happen on your machine: Streamlit Cloud
-serves the CSVs committed to this repo and wipes its own filesystem on restart,
-so nothing you fetch there would survive or be visible anyway.
+Run the local app (`start_app.bat`) and open the **Update data** view. The
+sidebar carries a one-line status from wherever you are — `⛔ step 1: new token
+needed`, `📤 step 3: 4 file(s) to publish`, or `✅ ready`. All three steps have
+to happen on your machine: Streamlit Cloud serves the CSVs committed to this
+repo and wipes its own filesystem on restart, so nothing you fetch there would
+survive or be visible anyway.
 
 1. **NFL Pro token.** The Authorization bearer is a JWT good for about an hour,
    so it's usually what's broken. On pro.nfl.com while logged in: DevTools →
@@ -75,9 +113,10 @@ so nothing you fetch there would survive or be visible anyway.
    Until you publish, the hosted app still shows the old numbers. If the push
    is rejected because the remote moved on, `git pull --rebase` and republish.
 
-The panel is hidden when the app runs on Streamlit Cloud (see
+The three steps are hidden when the app runs on Streamlit Cloud (see
 `running_locally()`), since that deployment is public — a token box on it would
-be a token box for anyone who finds the URL.
+be a token box for anyone who finds the URL. The coverage table above them
+stays, because it needs no token and answers a question worth asking there.
 
 Unattended updates (a cron/Action refreshing the data on its own) aren't
 possible as things stand: the token dies after an hour, so a stored secret
@@ -87,6 +126,7 @@ The same pipeline by hand:
 
 ```
 python fetch_2026.py               # preseason game JSONs -> games_2026/
+python fetch_2026.py --check       # which scheduled games are missing (no token needed)
 python backfill_situations.py      # down/distance onto game JSONs fetched before it existed
 python preprocess_2026.py          # -> data_2026/ CSVs (side-repair included)
 python fetch_reg_wk1.py --season N # REG wk1 opening lineups (starter ground truth)
@@ -97,6 +137,10 @@ git add data_2026 games_2026 starter_*.csv && git commit -m "data: update" && gi
 
 Coach data comes from the local NFL_Data Postgres (`coaching` /
 `coaching_current`) via `hc_by_season.csv`.
+
+`teams.csv` (from `pro.nfl.com/api/teams/all`) carries a `smartId` column next
+to the short team id: the schedule endpoint identifies teams only by that long
+form, and it's what lets a missing game be reported as "AZ @ LV".
 
 Note: the 2024/2025 source JSONs label offense/defense by home/away, not
 possession — `preprocess_2026.py` repairs sides, preferring the API's
