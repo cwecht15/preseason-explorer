@@ -435,6 +435,50 @@ def starting_qb_snaps(pp):
     return started[["gameId", "nflPlayId", "qbTeamId", "QB1"]]
 
 
+NAME_SUFFIXES = {"Jr.", "Sr.", "II", "III", "IV", "V"}
+
+
+def qb1_label(names):
+    """Name the starter(s) behind a w/ QB1 ratio.
+
+    A player's denominator is only meaningful once you know whose first team it
+    was, and that changes game to game — AZ opened the HOF game with Beck and
+    week 1 with Brissett, so two Cardinals RBs can show different denominators
+    and be measured against different quarterbacks.
+    """
+    names = [n for n in dict.fromkeys(names) if isinstance(n, str) and n]
+    if not names:
+        return "—"
+    if len(names) == 1:
+        return names[0]
+    last = []
+    for n in names:
+        parts = n.split()
+        last.append(parts[-2] if len(parts) > 2 and parts[-1] in NAME_SUFFIXES
+                    else parts[-1])
+    return " / ".join(last[:2]) + (f" +{len(last) - 2}" if len(last) > 2 else "")
+
+
+def drive_label(rows, cap=8):
+    """"HOF D1,D3 · Wk 1 D5" — the team drives he was on the field for.
+
+    Drive numbers count both teams' possessions in game order, the same
+    numbering the Team Explorer's drive matrix uses, so D1 is the game's
+    opening drive and low numbers mean he was out there with the first group.
+    """
+    parts, shown = [], 0
+    for week, grp in rows.sort_values(["week", "driveNum"]).groupby("week"):
+        nums = [int(d) for d in grp["driveNum"]]
+        room = max(cap - shown, 0)
+        if not room:
+            break
+        parts.append(f"{WEEK_NAMES.get(week, week)} "
+                     + ",".join(f"D{n}" for n in nums[:room]))
+        shown += min(len(nums), room)
+    total = len(rows)
+    return " · ".join(parts) + (f" +{total - shown}" if total > shown else "")
+
+
 def league_chances(pp):
     """One row per (player, snap that was his to play), for every team at once.
 
@@ -462,7 +506,9 @@ def board_frame(data_dir, weeks_key, pass_late, pass_second, short, side,
     # eleven on the *other* side of the ball, so he isn't in `pp` at all. Each
     # play has one offense, so this resolves to his own starter on offensive
     # rows and the one he lined up against on defensive rows.
-    qb1_keys = starting_qb_snaps(pp_all)[["gameId", "nflPlayId"]].drop_duplicates()
+    qb1 = starting_qb_snaps(pp_all)
+    qb1_keys = qb1[["gameId", "nflPlayId"]].drop_duplicates()
+    starters = qb1[["gameId", "qbTeamId", "QB1"]].drop_duplicates()
 
     pp = pp_all[pp_all["side"] == side]
     if pp.empty:
@@ -492,6 +538,25 @@ def board_frame(data_dir, weeks_key, pass_late, pass_second, short, side,
                .groupby(key)["gameQ1"].sum().rename("q1Team"))
     board = board.merge(played_q1, on=key, how="left").merge(team_q1, on=key, how="left")
 
+    # who that starter actually was, per player, across the games he was there
+    if side == "off":
+        named = his_games.merge(starters, left_on=["gameId", "teamId"],
+                                right_on=["gameId", "qbTeamId"], how="left")
+    else:  # the starter on the other sideline
+        named = his_games.merge(starters, on="gameId", how="left")
+        named = named[named["qbTeamId"] != named["teamId"]]
+    board = board.merge(named.groupby(key)["QB1"].apply(qb1_label).rename("QB1name"),
+                        on=key, how="left")
+
+    # which of his team's drives he was actually out there for: the aggregate
+    # counts say how much, this says when — early drives are the starters'
+    drives = pp[["playerName", "teamId", "week", "driveNum"]].dropna().drop_duplicates()
+    board = board.merge(drives.groupby(key).size().rename("Drives"), on=key, how="left")
+    # columns picked before apply, not include_groups= — that kwarg only exists
+    # on pandas 2.2+, and this way needs no floor at all
+    board = board.merge(drives.groupby(key)[["week", "driveNum"]].apply(drive_label)
+                        .rename("driveList"), on=key, how="left")
+
     for name, mask in BOARD_MASKS.items():
         played = pp[mask(pp, sit)].groupby(key).size().rename(f"{name}Played")
         had = chances[mask(chances, sit)].groupby(key).size().rename(f"{name}Chances")
@@ -508,6 +573,7 @@ def board_display(board, mode, side="off"):
     out = pd.DataFrame({"Player": board["playerName"], "Team": board["Team"],
                         "Pos": board["Pos"], "Snaps": board["Snaps"]})
     # on defense the starter in question is the one across the line
+    out["QB1" if side == "off" else "QB1 faced"] = board["QB1name"].fillna("—")
     pairs = [("w/ QB1" if side == "off" else "vs QB1", "q1Played", "q1Team")] + \
             [(n, f"{n}Played", f"{n}Chances") for n in BOARD_MASKS]
     for label, played, total in pairs:
@@ -518,6 +584,8 @@ def board_display(board, mode, side="off"):
                           board[total].where(board[total] > 0)).round(1)
         else:
             out[label] = board[played].astype(str) + "/" + board[total].astype(str)
+    out["Drives"] = board["Drives"].fillna(0).astype(int)
+    out["Drives played"] = board["driveList"].fillna("—")
     return out
 
 
@@ -564,7 +632,7 @@ def render_board(data_dir, weeks_selected, season, sit):
                     help="Count only the snaps that game's starting QB was on the "
                          "field for — both halves of every ratio.")
     with c5:
-        min_snaps = st.number_input("Min snaps", 0, 200, 5, key="bd_min")
+        min_snaps = st.number_input("Min snaps", 0, 200, 1, key="bd_min")
     mode = BOARD_MODES[mode_name]
 
     shown = board
@@ -579,7 +647,8 @@ def render_board(data_dir, weeks_selected, season, sit):
         return
 
     qb_col = "w/ QB1" if side == "off" else "vs QB1"
-    sort_cols = ["Snaps", qb_col] + list(BOARD_MASKS) + ["Team, then snaps", "Player"]
+    sort_cols = ["Snaps", qb_col] + list(BOARD_MASKS) + ["Drives", "Team, then snaps",
+                                                         "Player"]
     sort_by = st.selectbox("Sort by", sort_cols, key="bd_sort",
                            help="Ratio cells are text, so clicking a column header "
                                 "sorts them alphabetically — use this instead, or "
@@ -588,6 +657,8 @@ def render_board(data_dir, weeks_selected, season, sit):
         shown = shown.sort_values(["Team", "Snaps"], ascending=[True, False])
     elif sort_by == "Player":
         shown = shown.sort_values("playerName")
+    elif sort_by == "Drives":
+        shown = shown.sort_values("Drives", ascending=False)
     elif sort_by == qb_col:
         shown = shown.sort_values("q1Played", ascending=False)
     else:
@@ -604,7 +675,21 @@ def render_board(data_dir, weeks_selected, season, sit):
                       "is whoever took the unit's first snap, not whoever took the "
                       "most — in preseason those are opposite people. On defense it "
                       "counts snaps against the opposing starter.")
-    st.dataframe(table, **WIDE, hide_index=True, height=620)
+    st.caption("Click a row to open that player's detail page.")
+    # The key carries a nonce so a jump can drop the selection behind it —
+    # otherwise coming back to the board would bounce straight out again on the
+    # row still highlighted from last time.
+    nonce = st.session_state.get("bd_sel_nonce", 0)
+    event = st.dataframe(table, **WIDE, hide_index=True, height=620,
+                         key=f"bd_table_{nonce}", on_select="rerun",
+                         selection_mode="single-row")
+    picked = getattr(getattr(event, "selection", None), "rows", None) or []
+    if picked:
+        st.session_state["bd_sel_nonce"] = nonce + 1
+        st.session_state["player_pick"] = table.iloc[picked[0]]["Player"]
+        st.session_state["view"] = "Player Explorer"
+        st.rerun()
+
     st.download_button("Download board (CSV)",
                        table.to_csv(index=False).encode("utf-8"),
                        file_name=f"situation_board_{season}_{side}.csv",
@@ -1578,7 +1663,8 @@ def render_player_situations(pp_all, player_name, sit):
 # ---------- Sidebar ----------
 view = st.sidebar.radio(
     "View", ["Situation Board", "Player Explorer", "Team Explorer",
-             "Starter Trends", "Update data"])
+             "Starter Trends", "Update data"],
+    key="view")  # keyed so a click on the board can switch pages
 
 # The update view is a page of its own, so the sidebar only carries the one line
 # that used to be the panel's header: which step is waiting on you, from wherever
@@ -1634,7 +1720,10 @@ if view == "Team Explorer":
 st.title("Preseason Player Co-Players Explorer")
 
 all_names = sorted(pp_df["playerName"].dropna().unique().tolist())
-player_name = st.selectbox("Player", options=all_names, index=None,
+# a player carried in from the board (or a previous season) may not exist here
+if st.session_state.get("player_pick") not in all_names:
+    st.session_state.pop("player_pick", None)
+player_name = st.selectbox("Player", options=all_names, index=None, key="player_pick",
                            placeholder="Type to search a player…")
 if not player_name:
     st.caption("Pick a player to view results.")

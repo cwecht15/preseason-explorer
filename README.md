@@ -30,17 +30,23 @@ defense.
 | Column | |
 |---|---|
 | Snaps | his pass/rush snaps in the selected weeks |
-| w/ QB1 | of the snaps that game's **starting** QB was on the field for, how many he was out there for. On defense the column is `vs QB1` — the starter he lined up against |
+| QB1 | who that starter actually was, across the games he played — "Beck / Brissett" when it changed week to week |
+| w/ QB1 | of the snaps that game's **starting** QB was on the field for, how many he was out there for. On defense the pair is `QB1 faced` / `vs QB1` — the starter he lined up against |
 | RZ · GL | inside the 20 (goal line included) · inside the 5 or goal-to-go |
 | ShortYd · PassDn | 2 or fewer to go · 3rd/4th & 5+ or 2nd & 8+ (both follow the sidebar sliders) |
 | 3rdDn · Q4 | third down · fourth quarter, where late duty marks depth |
+| Drives · Drives played | how many of his team's drives he was out there for, and which ones — `Wk 1 D2,D4,D6`. Drive numbers count both teams' possessions in game order, so low numbers are the first group |
+
+**Click any row** to open that player's Player Explorer page.
 
 Cells are `played/chances`, the same drive window the Situations tabs use, so
 the two reconcile exactly. **The starter is whoever took the unit's first snap
 of that game, not whoever took the most** — in preseason those are opposite
 people, and it's resolved per game, so a starter who changes week to week is
-handled. The denominator counts only games the player dressed for, so a week-3
-call-up isn't marked down for the starter snaps of weeks he wasn't there.
+handled; the QB1 column names him. The denominator counts only games the player
+dressed for, so a week-3 call-up isn't marked down for the starter snaps of
+weeks he wasn't there. That's why two Cardinals backs can read `7/10` and
+`10/49` — different quarterbacks, different games.
 
 Two notes. The board's `RZ` includes goal-line snaps, while the Situations tab's
 `Red zone (6-20)` bucket excludes them (those zones are mutually exclusive) — so
