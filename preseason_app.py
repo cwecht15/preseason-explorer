@@ -730,6 +730,28 @@ def render_movers(board, weeks_selected):
                                     or "nobody lost ground"))
 
 
+def shade(col, diverging=False):
+    """CSS backgrounds for one column, scaled across its own range.
+
+    Hand-rolled rather than Styler.background_gradient, which needs matplotlib
+    — a dependency worth avoiding for a deploy that reinstalls on every push,
+    and one whose absence only shows up in production.
+    """
+    v = pd.to_numeric(col, errors="coerce")
+    if diverging:  # signed: red for ground lost, green for ground gained
+        limit = max(abs(v.min()), abs(v.max()), 1) if v.notna().any() else 1
+        return ["" if pd.isna(x) else
+                "background-color: rgba({}, {:.2f})".format(
+                    "46,160,90" if x > 0 else "205,70,60",
+                    min(abs(x) / limit, 1) * 0.55)
+                for x in v]
+    lo, hi = (v.min(), v.max()) if v.notna().any() else (0, 1)
+    span = (hi - lo) or 1
+    return ["" if pd.isna(x) else
+            f"background-color: rgba(31,119,180, {0.06 + 0.5 * (x - lo) / span:.2f})"
+            for x in v]
+
+
 def board_styler(table, mode):
     """Colour the numeric columns so 600 rows can be scanned, not read."""
     numeric = [c for c in ("% of room", "Δ share") if c in table.columns]
@@ -738,13 +760,7 @@ def board_styler(table, mode):
     numeric = [c for c in numeric if pd.api.types.is_numeric_dtype(table[c])]
     styler = table.style
     for col in numeric:
-        # Δ is signed, so it gets a diverging scale centred on "no change"
-        if col == "Δ share":
-            limit = max(abs(table[col].min() or 0), abs(table[col].max() or 0), 1)
-            styler = styler.background_gradient("RdYlGn", subset=[col],
-                                                vmin=-limit, vmax=limit)
-        else:
-            styler = styler.background_gradient("Blues", subset=[col])
+        styler = styler.apply(shade, diverging=(col == "Δ share"), subset=[col])
     # em dash, not "None": a player with one week of snaps has no delta to show,
     # which is an absence of comparison rather than a value of nothing
     return styler.format(precision=1, na_rep="—")
